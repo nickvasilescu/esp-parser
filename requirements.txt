@@ -2,6 +2,9 @@
 anthropic
 python-dotenv
 
+# Orgo CUA
+orgo
+
 # Selenium/Browser Automation
 selenium
 seleniumbase

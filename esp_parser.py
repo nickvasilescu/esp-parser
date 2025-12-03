@@ -2,6 +2,9 @@
 """
 ESP PDF Parser - Extract structured product data from ESP+ sell sheets using Claude Opus 4.5.
 
+This module is a thin wrapper around pdf_processor.py for backward compatibility.
+It uses the EXTRACTION_PROMPT from prompt.py to parse product sell sheets.
+
 Usage:
     python esp_parser.py -f product.pdf              # Single file, output to both stdout and file
     python esp_parser.py -d ./pdfs/ -o file          # Directory of PDFs, output to files only
@@ -9,28 +12,28 @@ Usage:
 """
 
 import argparse
-import base64
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Optional
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
 from prompt import EXTRACTION_PROMPT
-
-
-def load_pdf_as_base64(pdf_path: str) -> str:
-    """Read a PDF file and return its base64-encoded content."""
-    with open(pdf_path, "rb") as f:
-        return base64.standard_b64encode(f.read()).decode("utf-8")
+from pdf_processor import (
+    process_pdf,
+    save_json_output,
+    process_directory as _process_directory
+)
 
 
 def parse_pdf(pdf_path: str, client: Anthropic) -> dict:
     """
     Parse a single PDF file using Claude Opus 4.5 and return the extracted JSON.
+    
+    This is a convenience wrapper that uses the standard EXTRACTION_PROMPT
+    for product sell sheets.
     
     Args:
         pdf_path: Path to the PDF file
@@ -43,62 +46,7 @@ def parse_pdf(pdf_path: str, client: Anthropic) -> dict:
         ValueError: If the API response cannot be parsed as JSON
         FileNotFoundError: If the PDF file doesn't exist
     """
-    if not os.path.exists(pdf_path):
-        raise FileNotFoundError(f"PDF file not found: {pdf_path}")
-    
-    pdf_base64 = load_pdf_as_base64(pdf_path)
-    
-    response = client.messages.create(
-        model="claude-opus-4-5-20251101",
-        max_tokens=8192,
-        system=EXTRACTION_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": pdf_base64
-                        }
-                    }
-                ]
-            }
-        ]
-    )
-    
-    # Extract text content from response
-    response_text = ""
-    for block in response.content:
-        if hasattr(block, "text"):
-            response_text += block.text
-    
-    # Parse the JSON response
-    try:
-        # Try to find JSON in the response (in case there's any extra text)
-        response_text = response_text.strip()
-        
-        # If response starts with ```, try to extract JSON from code block
-        if response_text.startswith("```"):
-            lines = response_text.split("\n")
-            # Remove first line (```json or ```) and last line (```)
-            json_lines = []
-            in_json = False
-            for line in lines:
-                if line.startswith("```") and not in_json:
-                    in_json = True
-                    continue
-                elif line.startswith("```") and in_json:
-                    break
-                elif in_json:
-                    json_lines.append(line)
-            response_text = "\n".join(json_lines)
-        
-        return json.loads(response_text)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to parse API response as JSON: {e}\nResponse: {response_text[:500]}...")
+    return process_pdf(pdf_path, client, EXTRACTION_PROMPT)
 
 
 def save_output(data: dict, pdf_path: str, output_dir: Optional[str] = None) -> str:
@@ -113,19 +61,7 @@ def save_output(data: dict, pdf_path: str, output_dir: Optional[str] = None) -> 
     Returns:
         Path to the saved JSON file
     """
-    pdf_path = Path(pdf_path)
-    
-    if output_dir:
-        output_path = Path(output_dir) / f"{pdf_path.stem}.json"
-        # Ensure output directory exists
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-    else:
-        output_path = pdf_path.with_suffix(".json")
-    
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    
-    return str(output_path)
+    return save_json_output(data, pdf_path, output_dir)
 
 
 def process_directory(
@@ -146,46 +82,13 @@ def process_directory(
     Returns:
         List of results (each with 'file', 'success', 'data' or 'error')
     """
-    dir_path = Path(dir_path)
-    if not dir_path.is_dir():
-        raise NotADirectoryError(f"Not a valid directory: {dir_path}")
-    
-    pdf_files = list(dir_path.glob("*.pdf")) + list(dir_path.glob("*.PDF"))
-    
-    if not pdf_files:
-        print(f"No PDF files found in {dir_path}", file=sys.stderr)
-        return []
-    
-    results = []
-    total = len(pdf_files)
-    
-    for i, pdf_file in enumerate(pdf_files, 1):
-        print(f"Processing [{i}/{total}]: {pdf_file.name}...", file=sys.stderr)
-        
-        result = {"file": str(pdf_file), "success": False}
-        
-        try:
-            data = parse_pdf(str(pdf_file), client)
-            result["success"] = True
-            result["data"] = data
-            
-            # Handle output based on mode
-            if output_mode in ("stdout", "both"):
-                print(f"\n--- {pdf_file.name} ---")
-                print(json.dumps(data, indent=2, ensure_ascii=False))
-            
-            if output_mode in ("file", "both"):
-                saved_path = save_output(data, str(pdf_file), output_dir)
-                print(f"  Saved to: {saved_path}", file=sys.stderr)
-                result["output_file"] = saved_path
-                
-        except Exception as e:
-            result["error"] = str(e)
-            print(f"  Error: {e}", file=sys.stderr)
-        
-        results.append(result)
-    
-    return results
+    return _process_directory(
+        dir_path, 
+        client, 
+        EXTRACTION_PROMPT, 
+        output_mode, 
+        output_dir
+    )
 
 
 def main():
