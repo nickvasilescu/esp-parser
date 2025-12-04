@@ -359,7 +359,8 @@ def run_esp_pipeline(
             parsed_presentation = process_pdf(
                 presentation_pdf_path,
                 anthropic_client,
-                PRESENTATION_EXTRACTION_PROMPT
+                PRESENTATION_EXTRACTION_PROMPT,
+                max_tokens=32768  # Opus 4.5 supports up to 64k output tokens
             )
             
             # Extract products list

@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "generated_at": "2025-12-03T20:10:02.704826",
+    "source_type": "esp",
+    "presentation_url": "https://portal.mypromooffice.com/presentations/500183020?accessCode=b07e67d01cbd4ca2ba71934d128e1a44",
+    "presentation_title": null,
+    "client": {},
+    "presenter": {},
+    "total_items_in_presentation": 0,
+    "total_items_processed": 0,
+    "total_errors": 1
+  },
+  "products": [],
+  "errors": [
+    {
+      "step": "presentation_parse",
+      "message": "Failed to parse JSON: Expecting ',' delimiter: line 511 column 41 (char 23882)\nResponse: {\n  \"presentation\": {\n    \"title\": null,\n    \"client_name\": null,\n    \"client_company\": null,\n    \"presenter_name\": null,\n    \"presenter_company\": \"STBL Strategies\",\n    \"presenter_website\": \"stblstrategies.com\",\n    \"presenter_email\": null,\n    \"presenter_phone\": null,\n    \"date\": null,\n    \"notes\": null\n  },\n  \"products\": [\n    {\n      \"cpn\": \"CPN-564949909\",\n      \"name\": \"Etched Pinot Noir Red Wine Bottle\",\n      \"description\": \"Mark a big milestone with this 750ml California pinot noir bott..."
+    }
+  ],
+  "ready_for_zoho": true,
+  "zoho_integration_notes": {
+    "item_master": "Each product can be created as an Item in Zoho Books",
+    "quote_line_items": "For each product, create 3 line items: Product, Setup Fee, Estimated Shipping",
+    "sku_format": "[Client Account #] - [Vendor Item #]",
+    "track_inventory": false
+  }
+}

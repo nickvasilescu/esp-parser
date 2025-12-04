@@ -54,7 +54,7 @@ ESP_PORTAL_URL: str = os.getenv("ESP_PORTAL_URL", "https://portal.mypromooffice.
 
 AWS_ACCESS_KEY_ID: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION: str = os.getenv("AWS_REGION", "us-east-2")
 AWS_S3_BUCKET: Optional[str] = os.getenv("AWS_S3_BUCKET")
 
 # Pre-signed URL expiration time in seconds (default: 1 hour)

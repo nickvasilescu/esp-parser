@@ -1,0 +1,309 @@
+{
+  "metadata": {
+    "generated_at": "2025-12-03T20:40:35.513065",
+    "source_type": "esp",
+    "presentation_url": "https://portal.mypromooffice.com/presentations/500183020?accessCode=b07e67d01cbd4ca2ba71934d128e1a44",
+    "presentation_title": null,
+    "client": {
+      "name": null,
+      "company": null
+    },
+    "presenter": {
+      "name": null,
+      "company": "STBL Strategies"
+    },
+    "total_items_in_presentation": 25,
+    "total_items_processed": 1,
+    "total_errors": 0
+  },
+  "products": [
+    {
+      "vendor": {
+        "name": "A Plus Wine Designs",
+        "asi": "30223",
+        "website": "apluswd.com",
+        "line_name": null,
+        "trade_name": null,
+        "contact_name": "Michael McCarron",
+        "address": {
+          "line1": "900 Civic Center Dr.",
+          "line2": null,
+          "city": "National City",
+          "state": "CA",
+          "postal_code": "91950",
+          "country": "USA"
+        },
+        "phones": [
+          "(800) 201-9463",
+          "(619) 238-1867"
+        ],
+        "emails": [
+          "info@apluswd.com"
+        ],
+        "hours": "Mon-Fri, 8:00am-4:30pm PST",
+        "fob_points": [
+          {
+            "city": "National City",
+            "state": "CA",
+            "postal_code": "91950",
+            "country": "USA"
+          }
+        ]
+      },
+      "item": {
+        "vendor_sku": "101142",
+        "mpn": "101142",
+        "cpn": "564949909",
+        "name": "Etched Pinot Noir Red Wine Bottle",
+        "description_short": "750-milliliter California pinot noir bottle with deep hand etching and optional hand-painted color fills.",
+        "description_long": "Mark a big milestone with this 750ml California pinot noir bottle. This item uses deep hand etching and optional hand-painted color fills, exemplifying superior craftsmanship. With a 5-star rating maintained for over 15 years, it displays quality custom labeling and etching. Each bottle is hand-crafted by artisans in our California facility, making it a perfect choice for significant occasions. Custom etch corporate logos and personalized text for an unforgettable presentation. What a great way to promote your business. We carry all widely available name brand wines. See ordering guidelines for protective packaging pricing that will apply.",
+        "categories": [
+          "Beverages- Wine/champagne/liquor"
+        ],
+        "themes": [
+          "Corporate",
+          "Holidays",
+          "Employee Recognition",
+          "Thank You"
+        ],
+        "materials": [
+          "Glass"
+        ],
+        "primary_color": "Red",
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "unit": null
+        },
+        "dimensions_raw": null,
+        "weight_value": null,
+        "weight_unit": null,
+        "item_assembled": null,
+        "colors": [
+          "Red"
+        ]
+      },
+      "variants": [
+        {
+          "component": "product",
+          "attribute": "color",
+          "label": "Color",
+          "options": [
+            "Red"
+          ],
+          "notes": null
+        },
+        {
+          "component": "product",
+          "attribute": "size",
+          "label": "Sizes",
+          "options": [
+            "750 ml"
+          ],
+          "notes": null
+        },
+        {
+          "component": "product",
+          "attribute": "imprint_color_option",
+          "label": "Front Imprint Area Color Choice",
+          "options": [
+            "750ml 1 Color",
+            "750ml 2 Color",
+            "750ml 3 Color"
+          ],
+          "notes": null
+        },
+        {
+          "component": "product",
+          "attribute": "color_fill",
+          "label": "Color Fill Choice",
+          "options": [
+            "Hand-painted Color Fill"
+          ],
+          "notes": null
+        }
+      ],
+      "pricing": {
+        "price_code": "5R",
+        "currency": "USD",
+        "valid_through": "2026-10-21",
+        "notes": "Price Includes: One color fill. Price subject to change without notice, please verify with Supplier.",
+        "breaks": [
+          {
+            "min_qty": 12,
+            "max_qty": null,
+            "catalog_price": 62.63,
+            "net_cost": 37.578,
+            "profit_per_unit": 25.05,
+            "notes": null
+          },
+          {
+            "min_qty": 48,
+            "max_qty": null,
+            "catalog_price": 57.5,
+            "net_cost": 34.5,
+            "profit_per_unit": 23.0,
+            "notes": null
+          },
+          {
+            "min_qty": 108,
+            "max_qty": null,
+            "catalog_price": 53.68,
+            "net_cost": 32.208,
+            "profit_per_unit": 21.47,
+            "notes": null
+          },
+          {
+            "min_qty": 204,
+            "max_qty": null,
+            "catalog_price": 50.93,
+            "net_cost": 30.558,
+            "profit_per_unit": 20.37,
+            "notes": null
+          },
+          {
+            "min_qty": 300,
+            "max_qty": null,
+            "catalog_price": 49.0,
+            "net_cost": 29.4,
+            "profit_per_unit": 19.6,
+            "notes": null
+          }
+        ]
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Set-up Charge",
+          "description": "Deep Etch set-up charge",
+          "decoration_method": "Deep Etch",
+          "charge_basis": "per_order",
+          "list_price": 156.25,
+          "net_cost": 125.0,
+          "price_code": "V",
+          "min_qty": null,
+          "notes": null
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "750ml 1 Color Imprint Option Charge",
+          "description": "Imprint option charge for 1 color",
+          "decoration_method": "Deep Etch",
+          "charge_basis": "qur",
+          "list_price": null,
+          "net_cost": null,
+          "price_code": null,
+          "min_qty": null,
+          "notes": "QUR"
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "750ml 2 Color Imprint Option Charge",
+          "description": "Imprint option charge for 2 colors",
+          "decoration_method": "Deep Etch",
+          "charge_basis": "per_unit",
+          "list_price": 10.0,
+          "net_cost": 5.0,
+          "price_code": "P",
+          "min_qty": null,
+          "notes": null
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "750ml 3 Color Imprint Option Charge",
+          "description": "Imprint option charge for 3 colors",
+          "decoration_method": "Deep Etch",
+          "charge_basis": "per_unit",
+          "list_price": 20.0,
+          "net_cost": 10.0,
+          "price_code": "P",
+          "min_qty": null,
+          "notes": null
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "Color Fill Choice Imprint Option Charge",
+          "description": "Hand-painted Color Fill option charge",
+          "decoration_method": "Deep Etch",
+          "charge_basis": "qur",
+          "list_price": null,
+          "net_cost": null,
+          "price_code": null,
+          "min_qty": null,
+          "notes": "QUR"
+        },
+        {
+          "fee_type": "payment_surcharge",
+          "name": "Credit Card Surcharge",
+          "description": "A surcharge of 3% may apply to orders paid with a credit card in USD on orders over $1,000.",
+          "decoration_method": null,
+          "charge_basis": "percentage",
+          "list_price": 3.0,
+          "net_cost": null,
+          "price_code": null,
+          "min_qty": null,
+          "notes": "On orders over $1,000"
+        }
+      ],
+      "decoration": {
+        "sold_unimprinted": false,
+        "personalization_available": false,
+        "full_color_process_available": false,
+        "imprint_colors_description": "750ml 1 Color, 750ml 2 Color, 750ml 3 Color options available with hand-painted color fill",
+        "methods": [
+          {
+            "name": "Deep Etch",
+            "full_color": false,
+            "max_colors": 3,
+            "notes": "Deep hand etching with optional hand-painted color fills"
+          }
+        ],
+        "locations": [
+          {
+            "name": "Front Imprint Area",
+            "component": "product",
+            "methods_allowed": [
+              "Deep Etch"
+            ],
+            "imprint_areas": [
+              {
+                "width": 3.0,
+                "height": 4.0,
+                "unit": "in",
+                "raw": "3\" x 4\""
+              }
+            ]
+          }
+        ],
+        "multi_color_options": {
+          "supports_multi_color": true,
+          "description": "Supports up to 3 color etching with additional per-unit charges for 2 and 3 color options. Hand-painted color fill available (QUR)."
+        }
+      },
+      "flags": {
+        "source_format": "ESP+ PDF",
+        "has_kit_components": false,
+        "ocr_quality": null
+      },
+      "raw_notes": {
+        "packaging": "See ordering guidelines for protective packaging pricing that will apply.",
+        "lead_time": "5 business days",
+        "supplier_disclaimers": [
+          "Price subject to change without notice, please verify with Supplier.",
+          "A surcharge of 3% may apply to orders paid with a credit card in USD on orders over $1,000.",
+          "Prop 65 Warning: This product can expose you to chemicals including alcoholic and Drinking distilled spirits, beer, coolers, wine and other alcoholic beverages may increase cancer risk, and, during pregnancy, can cause birth defects. For more information go to www.P65Warnings.ca.gov/alcohol., which are known to the State of California to cause cancer. For more information, go to www.P65Warnings.ca.gov."
+        ],
+        "other": "Assembled In: U.S.A. We carry all widely available name brand wines."
+      }
+    }
+  ],
+  "errors": [],
+  "ready_for_zoho": true,
+  "zoho_integration_notes": {
+    "item_master": "Each product can be created as an Item in Zoho Books",
+    "quote_line_items": "For each product, create 3 line items: Product, Setup Fee, Estimated Shipping",
+    "sku_format": "[Client Account #] - [Vendor Item #]",
+    "track_inventory": false
+  }
+}

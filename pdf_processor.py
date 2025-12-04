@@ -86,7 +86,7 @@ def process_pdf(
     client: Anthropic,
     system_prompt: str,
     model: str = "claude-opus-4-5-20251101",
-    max_tokens: int = 8192
+    max_tokens: int = 32768  # Opus 4.5 supports up to 64k output tokens
 ) -> Dict[str, Any]:
     """
     Process a single PDF file using Claude and return extracted data.
@@ -99,7 +99,7 @@ def process_pdf(
         client: Anthropic API client
         system_prompt: The system prompt defining extraction rules
         model: Claude model to use (default: claude-opus-4-5-20251101)
-        max_tokens: Maximum response tokens (default: 8192)
+        max_tokens: Maximum response tokens (default: 32768, Opus 4.5 max is 64k)
         
     Returns:
         Extracted data as a dictionary
@@ -154,7 +154,7 @@ def process_pdf_batch(
     client: Anthropic,
     system_prompt: str,
     model: str = "claude-opus-4-5-20251101",
-    max_tokens: int = 8192
+    max_tokens: int = 32768  # Opus 4.5 supports up to 64k output tokens
 ) -> List[Dict[str, Any]]:
     """
     Process multiple PDF files and return results.
@@ -240,7 +240,7 @@ def process_directory(
     output_mode: str = "both",
     output_dir: Optional[str] = None,
     model: str = "claude-opus-4-5-20251101",
-    max_tokens: int = 8192
+    max_tokens: int = 32768  # Opus 4.5 supports up to 64k output tokens
 ) -> List[Dict[str, Any]]:
     """
     Process all PDF files in a directory.

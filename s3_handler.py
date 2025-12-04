@@ -49,13 +49,20 @@ class S3Handler:
         self.bucket = AWS_S3_BUCKET
         self.region = AWS_REGION
         
-        # Initialize S3 client
+        # Initialize S3 client with regional endpoint to avoid 307 redirects
+        # Pre-signed URLs must be generated with the correct regional endpoint
+        regional_endpoint = f"https://s3.{AWS_REGION}.amazonaws.com"
+        
         self.s3_client = boto3.client(
             's3',
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION,
-            config=Config(signature_version='s3v4')
+            endpoint_url=regional_endpoint,
+            config=Config(
+                signature_version='s3v4',
+                s3={'addressing_style': 'virtual'}
+            )
         )
         
         logger.info(f"S3Handler initialized for job: {self.job_id}")
