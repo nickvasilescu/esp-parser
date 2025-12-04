@@ -34,11 +34,12 @@ export default function ComputerStream({
   };
 
   // Common wrapper style for expanded vs normal state
+  // Using 16:9 aspect ratio for modern displays
   const wrapperStyle = expanded
-    ? "fixed inset-4 z-50 shadow-2xl w-full h-full max-w-[1200px] mx-auto max-h-[90vh]"
-    : `aspect-[4/3] ${className}`;
+    ? "fixed inset-4 z-50 shadow-2xl w-full h-full max-w-[1400px] mx-auto max-h-[90vh]"
+    : `aspect-video ${className}`;
 
-  const inlineStyle = expanded ? { aspectRatio: "4/3" } : undefined;
+  const inlineStyle = expanded ? { aspectRatio: "16/9" } : undefined;
 
   // If no credentials are provided, show the placeholder image as a demo
   if (!host) {

@@ -20,11 +20,20 @@ function formatTime(isoString: string): string {
 interface JobsTableProps {
   jobs: Job[];
   onSelectJob: (job: Job) => void;
+  className?: string;
 }
 
-export default function JobsTable({ jobs, onSelectJob }: JobsTableProps) {
+export default function JobsTable({
+  jobs,
+  onSelectJob,
+  className,
+}: JobsTableProps) {
   return (
-    <div className="bg-card rounded-lg border border-border overflow-hidden">
+    <div
+      className={`bg-card rounded-lg border border-border overflow-hidden flex flex-col ${
+        className || ""
+      }`}
+    >
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h3 className="font-medium text-foreground">Active Workflows</h3>
         <div className="relative">
@@ -37,13 +46,13 @@ export default function JobsTable({ jobs, onSelectJob }: JobsTableProps) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-auto flex-1">
         <table className="w-full text-sm text-left">
           <thead className="bg-secondary/50 text-muted-foreground font-medium">
             <tr>
               <th className="px-4 py-3 w-[140px]">Status</th>
               <th className="px-4 py-3">Platform</th>
-              <th className="px-4 py-3">Product ID</th>
+              <th className="px-4 py-3">Client</th>
               <th className="px-4 py-3 w-[200px]">Progress</th>
               <th className="px-4 py-3">Started</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -69,8 +78,24 @@ export default function JobsTable({ jobs, onSelectJob }: JobsTableProps) {
                     <span className="font-medium">{job.platform}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 font-mono text-muted-foreground">
-                  {job.product_id}
+                <td className="px-4 py-3">
+                  <div className="flex flex-col">
+                    <span className="font-medium text-foreground">
+                      {job.client_name ||
+                        job.client_company ||
+                        "Unknown Client"}
+                    </span>
+                    {job.client_email && (
+                      <span className="text-xs text-muted-foreground">
+                        {job.client_email}
+                      </span>
+                    )}
+                    {job.client_company && job.client_name && (
+                      <span className="text-xs text-muted-foreground">
+                        {job.client_company}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-1">
