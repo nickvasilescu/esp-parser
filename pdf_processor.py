@@ -115,7 +115,8 @@ def process_pdf(
     
     pdf_base64 = load_pdf_as_base64(pdf_path)
     
-    response = client.messages.create(
+    # Use streaming for large max_tokens requests (required by Anthropic SDK for long operations)
+    with client.messages.stream(
         model=model,
         max_tokens=max_tokens,
         system=system_prompt,
@@ -134,13 +135,9 @@ def process_pdf(
                 ]
             }
         ]
-    )
-    
-    # Extract text content from response
-    response_text = ""
-    for block in response.content:
-        if hasattr(block, "text"):
-            response_text += block.text
+    ) as stream:
+        # Collect streamed text using SDK helper
+        response_text = stream.get_final_text()
     
     # Parse and return JSON
     result = extract_json_from_response(response_text)

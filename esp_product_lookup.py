@@ -68,6 +68,175 @@ class LookupResult:
 # Prompt Builder
 # =============================================================================
 
+def build_single_product_prompt(
+    product: ProductToLookup,
+    job_id: str,
+    upload_url: str,
+    product_index: int,
+    total_products: int,
+    is_first_product: bool = False
+) -> str:
+    """
+    Build the CUA prompt for looking up a SINGLE product in ESP+.
+    
+    This prompt is designed to be called sequentially for each product,
+    with each CUA agent handling exactly one product lookup.
+    
+    Args:
+        product: Single product to look up
+        job_id: Unique job identifier for organizing files
+        upload_url: Pre-signed S3 upload URL for this product
+        product_index: Current product index (1-based)
+        total_products: Total number of products being processed
+        is_first_product: If True, include full login instructions
+    
+    Returns:
+        Formatted prompt string for the CUA
+    """
+    working_dir = f"~/Downloads/{job_id}"
+    cpn = product.cpn or 'N/A'
+    
+    # Build product info
+    product_info = f"CPN: {cpn}\nName: {product.name}"
+    if product.supplier_name:
+        product_info += f"\nSupplier: {product.supplier_name}"
+    if product.supplier_asi:
+        product_info += f" (ASI: {product.supplier_asi})"
+    product_info += f"\nUpload URL: {upload_url}"
+    
+    # Phase 2 varies based on whether this is the first product
+    if is_first_product:
+        login_phase = f"""PHASE 2: LOGIN TO ESP PLUS
+1. Open Firefox browser (click on Firefox icon in taskbar)
+2. Navigate to: {ESP_PLUS_URL}
+3. Login using the credentials provided above:
+   - Enter email: {ESP_PLUS_EMAIL}
+   - Enter password: {ESP_PLUS_PASSWORD}
+4. Wait for the dashboard to load
+5. Take a screenshot to confirm successful login"""
+    else:
+        login_phase = f"""PHASE 2: CHECK ESP PLUS SESSION
+1. Take a screenshot to see current state
+2. If Firefox is already open with ESP Plus logged in:
+   - Proceed directly to Phase 3
+3. If Firefox is closed or not logged in:
+   - Open Firefox browser
+   - Navigate to: {ESP_PLUS_URL}
+   - Login with email: {ESP_PLUS_EMAIL} and password: {ESP_PLUS_PASSWORD}
+4. Ensure you're on the ESP Plus search page before continuing"""
+    
+    prompt = f"""You are a product data extraction agent. Your goal is to find ONE specific product in ESP Plus, print/save the product page as PDF, and upload it to cloud storage.
+
+IMPORTANT CONTEXT:
+- You are controlling a Linux desktop environment
+- Firefox browser is available
+- You have Terminal access for file operations
+- Job ID: {job_id}
+- Working directory: {working_dir}
+- Processing product {product_index} of {total_products}
+
+ESP PLUS CREDENTIALS:
+- URL: {ESP_PLUS_URL}
+- Email: {ESP_PLUS_EMAIL}
+- Password: {ESP_PLUS_PASSWORD}
+
+=============================================================================
+TARGET PRODUCT
+=============================================================================
+
+{product_info}
+
+=============================================================================
+WORKFLOW
+=============================================================================
+
+PHASE 1: VERIFY WORKING DIRECTORY
+1. Open a Terminal (or use an existing one)
+2. Ensure the working directory exists:
+   mkdir -p {working_dir}
+3. Verify it exists:
+   ls -la ~/Downloads/ | grep {job_id}
+
+{login_phase}
+
+PHASE 3: FIND AND DOWNLOAD PRODUCT
+1. SEARCH for the product:
+   - Clear any existing search text
+   - Enter the CPN: {cpn}
+   - The CPN format is like "CPN-564949909" - you can search with or without the "CPN-" prefix
+   - If CPN search fails, try the product name: "{product.name}"
+
+2. NAVIGATE to the product detail page:
+   - Click on the matching product in search results
+   - Verify you're on the correct product by checking CPN/name
+
+3. PRINT/SAVE THE PRODUCT PAGE AS PDF:
+   - Click the Print button (printer icon) on the product page
+   - In the print dialog, ensure "Save to PDF" is selected as the destination
+   - Click "Save" to download the PDF
+   - The PDF will contain the product details including pricing
+   - Wait for the download to complete
+   - Take a screenshot to confirm download completed
+
+4. IDENTIFY AND MOVE THE FILE:
+   - Go to Terminal
+   - Find the most recently downloaded PDF:
+     ls -lt ~/Downloads/*.pdf | head -n 2
+   - Move and rename it to the working directory:
+     mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/{cpn}_distributor_report.pdf
+   - Verify the file exists:
+     ls -la {working_dir}/{cpn}_distributor_report.pdf
+
+5. UPLOAD TO S3:
+   - Run this Python upload command:
+     python3 -c "import urllib.request; data=open('{working_dir}/{cpn}_distributor_report.pdf','rb').read(); req=urllib.request.Request('{upload_url}',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
+   - Verify the upload succeeded (HTTP 200 response printed)
+   - If the upload fails, retry once
+
+PHASE 4: COMPLETION
+1. Take a final screenshot showing the uploaded file
+2. Report success by confirming the file was uploaded (Status: 200)
+3. Your task for this product is complete
+
+=============================================================================
+IMPORTANT COMMANDS REFERENCE
+=============================================================================
+
+Create working directory:
+  mkdir -p {working_dir}
+
+Find newest PDF in Downloads:
+  ls -t ~/Downloads/*.pdf | head -1
+
+Move file to working directory:
+  mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/{cpn}_distributor_report.pdf
+
+Upload to S3:
+  python3 -c "import urllib.request; data=open('{working_dir}/{cpn}_distributor_report.pdf','rb').read(); req=urllib.request.Request('{upload_url}',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
+
+=============================================================================
+SEARCH TIPS
+=============================================================================
+
+1. **CPN Search** (most reliable):
+   - Enter the CPN exactly: {cpn}
+   - Or try without prefix: {cpn.replace('CPN-', '') if cpn.startswith('CPN-') else cpn}
+
+2. **Name Search** (fallback):
+   - Use key terms from: "{product.name}"
+
+=============================================================================
+BEGIN WORKFLOW
+=============================================================================
+
+Start by taking a screenshot to see the current state of the desktop.
+Your goal is to download and upload the Distributor Report for this ONE product: {cpn}
+Be methodical: Search -> Download -> Move/Rename -> Upload -> Confirm.
+"""
+    
+    return prompt
+
+
 def build_lookup_prompt(
     products: List[ProductToLookup],
     job_id: str,
@@ -75,6 +244,9 @@ def build_lookup_prompt(
 ) -> str:
     """
     Build the CUA prompt for looking up products in ESP+.
+    
+    DEPRECATED: Use build_single_product_prompt for sequential processing.
+    This function is kept for backwards compatibility.
     
     Args:
         products: List of products to look up
@@ -84,6 +256,21 @@ def build_lookup_prompt(
     Returns:
         Formatted prompt string for the CUA
     """
+    # If single product, use the new single-product prompt
+    if len(products) == 1:
+        product = products[0]
+        cpn = product.cpn or 'N/A'
+        upload_url = upload_url_map.get(cpn, '')
+        return build_single_product_prompt(
+            product=product,
+            job_id=job_id,
+            upload_url=upload_url,
+            product_index=1,
+            total_products=1,
+            is_first_product=True
+        )
+    
+    # For multiple products, use legacy batch prompt (not recommended)
     working_dir = f"~/Downloads/{job_id}"
     
     # Build product list for the prompt with their upload URLs
@@ -291,6 +478,10 @@ class ESPProductLookup:
     
     This agent logs into ESP+, searches for each product in the provided list,
     downloads the Distributor Report PDF for each, and uploads them to S3.
+    
+    For best results, use sequential single-product runs via run_single_product()
+    instead of batch runs. This improves reliability by isolating each product's
+    processing in its own CUA session.
     """
     
     def __init__(
@@ -299,7 +490,10 @@ class ESPProductLookup:
         job_id: str,
         upload_url_map: Dict[str, str],
         computer_id: Optional[str] = None,
-        dry_run: bool = False
+        dry_run: bool = False,
+        product_index: int = 1,
+        total_products: int = 1,
+        is_first_product: bool = True
     ):
         """
         Initialize the ESP Product Lookup agent.
@@ -310,12 +504,18 @@ class ESPProductLookup:
             upload_url_map: Dictionary mapping CPN to pre-signed S3 upload URL
             computer_id: Optional Orgo computer ID (defaults to ORGO_COMPUTER_ID)
             dry_run: If True, don't execute the CUA
+            product_index: Current product index (1-based) for progress tracking
+            total_products: Total number of products being processed
+            is_first_product: If True, include full login instructions in prompt
         """
         self.products = self._normalize_products(products)
         self.job_id = job_id
         self.upload_url_map = upload_url_map
         self.computer_id = computer_id or ORGO_COMPUTER_ID
         self.dry_run = dry_run
+        self.product_index = product_index
+        self.total_products = total_products
+        self.is_first_product = is_first_product
         
         self.computer: Optional[Computer] = None
         
@@ -342,16 +542,25 @@ class ESPProductLookup:
         """
         Execute the product lookup workflow.
         
+        For single-product runs (recommended), uses the optimized single-product prompt.
+        For batch runs (legacy), uses the multi-product prompt.
+        
         Returns:
             LookupResult with download statistics and file paths
         """
+        is_single_product = len(self.products) == 1
+        
         logger.info("=" * 60)
         logger.info("ESP PRODUCT LOOKUP AGENT")
         logger.info("=" * 60)
         logger.info(f"Job ID: {self.job_id}")
-        logger.info(f"Products to process: {len(self.products)}")
+        logger.info(f"Product {self.product_index}/{self.total_products}" if is_single_product else f"Products to process: {len(self.products)}")
+        if is_single_product:
+            logger.info(f"CPN: {self.products[0].cpn}")
+            logger.info(f"Name: {self.products[0].name}")
         logger.info(f"Upload URLs configured: {len(self.upload_url_map)}")
         logger.info(f"Dry run: {self.dry_run}")
+        logger.info(f"First product (full login): {self.is_first_product}")
         
         if self.dry_run:
             logger.info("[DRY RUN] Skipping CUA execution")
@@ -376,12 +585,26 @@ class ESPProductLookup:
             self.computer = Computer(computer_id=self.computer_id)
             logger.info(f"Connected to: orgo-{self.computer_id}.orgo.dev")
             
-            # Build the prompt
-            prompt = build_lookup_prompt(
-                products=self.products,
-                job_id=self.job_id,
-                upload_url_map=self.upload_url_map
-            )
+            # Build the prompt - use single product prompt for sequential processing
+            if is_single_product:
+                product = self.products[0]
+                cpn = product.cpn or 'N/A'
+                upload_url = self.upload_url_map.get(cpn, '')
+                prompt = build_single_product_prompt(
+                    product=product,
+                    job_id=self.job_id,
+                    upload_url=upload_url,
+                    product_index=self.product_index,
+                    total_products=self.total_products,
+                    is_first_product=self.is_first_product
+                )
+            else:
+                # Legacy batch prompt
+                prompt = build_lookup_prompt(
+                    products=self.products,
+                    job_id=self.job_id,
+                    upload_url_map=self.upload_url_map
+                )
             
             # Define progress callback
             def progress_callback(event_type: str, event_data: Any) -> None:
@@ -439,7 +662,7 @@ class ESPProductLookup:
                 total_products=len(self.products),
                 successful=0,
                 failed=len(self.products),
-                errors=[{"sku": "all", "message": str(e)}]
+                errors=[{"sku": self.products[0].cpn if self.products else "unknown", "message": str(e)}]
             )
 
 

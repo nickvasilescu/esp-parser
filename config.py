@@ -89,7 +89,7 @@ REMOTE_DOWNLOAD_DIR: str = os.getenv("REMOTE_DOWNLOAD_DIR", "/home/user/Download
 # =============================================================================
 
 # Claude model ID for the CUA
-MODEL_ID: str = os.getenv("MODEL_ID", "claude-sonnet-4-20250514")
+MODEL_ID: str = os.getenv("MODEL_ID", "claude-opus-4-5-20251101")
 
 # Thinking budget for extended thinking
 THINKING_BUDGET: int = int(os.getenv("THINKING_BUDGET", "2048"))

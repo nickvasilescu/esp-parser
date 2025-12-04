@@ -420,34 +420,87 @@ def run_esp_pipeline(
             except Exception as e:
                 logger.warning(f"Could not download from S3: {e}")
     elif products_to_lookup:
-        # Extract CPNs from products list
-        cpns = []
-        for p in products_to_lookup:
-            cpn = p.get("cpn") or p.get("sku") or p.get("item_number") or ""
-            if cpn:
-                cpns.append(cpn)
+        # =====================================================================
+        # SEQUENTIAL CUA AGENT PROCESSING
+        # Each product gets its own CUA agent session for reliability
+        # =====================================================================
+        total_products = len(products_to_lookup)
+        successful_uploads = 0
+        failed_uploads = 0
         
-        # Generate pre-signed upload URLs for each product
-        upload_url_map = s3_handler.generate_product_upload_urls(cpns)
-        logger.info(f"Generated {len(upload_url_map)} upload URLs for products")
+        logger.info(f"Processing {total_products} products sequentially (one CUA agent per product)")
         
-        lookup = ESPProductLookup(
-            products=products_to_lookup,
-            job_id=job_id,
-            upload_url_map=upload_url_map,
-            computer_id=computer_id,
-            dry_run=dry_run
-        )
+        for idx, product in enumerate(products_to_lookup, 1):
+            cpn = product.get("cpn") or product.get("sku") or product.get("item_number") or ""
+            product_name = product.get("name") or product.get("title") or "Unknown"
+            
+            logger.info("-" * 60)
+            logger.info(f"PRODUCT {idx}/{total_products}: {cpn}")
+            logger.info(f"Name: {product_name}")
+            logger.info("-" * 60)
+            
+            if not cpn:
+                logger.warning(f"Skipping product {idx} - no CPN/SKU found")
+                errors.append({
+                    "step": "product_lookup",
+                    "sku": "unknown",
+                    "message": f"Product {idx} has no CPN/SKU"
+                })
+                failed_uploads += 1
+                continue
+            
+            try:
+                # Generate upload URL for this single product
+                upload_url_map = s3_handler.generate_product_upload_urls([cpn])
+                logger.info(f"Generated upload URL for {cpn}")
+                
+                # Create CUA agent for this single product
+                lookup = ESPProductLookup(
+                    products=[product],
+                    job_id=job_id,
+                    upload_url_map=upload_url_map,
+                    computer_id=computer_id,
+                    dry_run=dry_run,
+                    product_index=idx,
+                    total_products=total_products,
+                    is_first_product=(idx == 1)  # Only first product needs full login
+                )
+                
+                # Run the CUA agent for this product
+                lookup_result = lookup.run()
+                
+                if lookup_result.successful > 0:
+                    logger.info(f"✓ Product {idx}/{total_products} ({cpn}): Upload successful")
+                    successful_uploads += 1
+                else:
+                    logger.warning(f"✗ Product {idx}/{total_products} ({cpn}): Upload failed")
+                    failed_uploads += 1
+                    for error in lookup_result.errors:
+                        errors.append({
+                            "step": "product_lookup",
+                            "sku": error.get("sku", cpn),
+                            "message": error.get("message", "Unknown error")
+                        })
+                
+            except Exception as e:
+                logger.error(f"✗ Product {idx}/{total_products} ({cpn}): Exception - {e}")
+                errors.append({
+                    "step": "product_lookup",
+                    "sku": cpn,
+                    "message": str(e)
+                })
+                failed_uploads += 1
+                # Continue to next product even if this one failed
+                continue
         
-        lookup_result = lookup.run()
+        logger.info("=" * 60)
+        logger.info(f"PRODUCT LOOKUP SUMMARY")
+        logger.info(f"  Total: {total_products}")
+        logger.info(f"  Successful: {successful_uploads}")
+        logger.info(f"  Failed: {failed_uploads}")
+        logger.info("=" * 60)
         
-        logger.info(f"Lookup complete: {lookup_result.successful}/{lookup_result.total_products} successful")
-        
-        # Download all product PDFs from S3
-        for pdf_info in lookup_result.downloaded_pdfs:
-            logger.info(f"  Uploaded to S3: {pdf_info['sku']} -> {pdf_info['remote_path']}")
-        
-        # Batch download all product PDFs from S3
+        # Batch download all successfully uploaded product PDFs from S3
         try:
             downloaded_files = s3_handler.download_directory("products", str(products_dir))
             downloaded_product_pdfs = downloaded_files
@@ -458,13 +511,6 @@ def run_esp_pipeline(
                 "message": f"Failed to download products from S3: {str(e)}"
             })
             logger.error(f"Failed to download product PDFs from S3: {e}")
-        
-        for error in lookup_result.errors:
-            errors.append({
-                "step": "product_lookup",
-                "sku": error.get("sku"),
-                "message": error.get("message")
-            })
     else:
         logger.warning("No products to look up")
     
@@ -479,9 +525,12 @@ def run_esp_pipeline(
     
     if downloaded_product_pdfs:
         anthropic_client = Anthropic()
+        total_pdfs = len(downloaded_product_pdfs)
+        successful_parses = 0
+        failed_parses = 0
         
-        for pdf_path in downloaded_product_pdfs:
-            logger.info(f"Parsing: {pdf_path}")
+        for idx, pdf_path in enumerate(downloaded_product_pdfs, 1):
+            logger.info(f"Parsing [{idx}/{total_pdfs}]: {pdf_path}")
             
             try:
                 parsed_data = process_pdf(
@@ -490,14 +539,26 @@ def run_esp_pipeline(
                     EXTRACTION_PROMPT
                 )
                 parsed_products.append(parsed_data)
-                logger.info(f"  Success: {parsed_data.get('item', {}).get('name', 'Unknown')}")
+                product_name = parsed_data.get('item', {}).get('name', 'Unknown')
+                logger.info(f"  ✓ Success: {product_name}")
+                successful_parses += 1
                 
             except Exception as e:
-                logger.error(f"  Failed: {e}")
+                logger.error(f"  ✗ Failed: {e}")
+                # Add to parsed_products with error flag
                 parsed_products.append({
                     "error": str(e),
                     "source_file": pdf_path
                 })
+                # Also add to errors list for comprehensive tracking
+                errors.append({
+                    "step": "product_parse",
+                    "source_file": pdf_path,
+                    "message": str(e)
+                })
+                failed_parses += 1
+        
+        logger.info(f"PDF Parsing complete: {successful_parses} successful, {failed_parses} failed")
     else:
         logger.warning("No product PDFs to parse")
     
