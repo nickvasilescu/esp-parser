@@ -19,7 +19,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from orgo import Computer
 
@@ -69,35 +69,48 @@ class LookupResult:
 # Prompt Builder
 # =============================================================================
 
-def build_lookup_prompt(products: List[ProductToLookup]) -> str:
+def build_lookup_prompt(
+    products: List[ProductToLookup],
+    job_id: str,
+    upload_url_map: Dict[str, str]
+) -> str:
     """
     Build the CUA prompt for looking up products in ESP+.
     
     Args:
         products: List of products to look up
+        job_id: Unique job identifier for organizing files
+        upload_url_map: Dictionary mapping CPN to pre-signed S3 upload URL
     
     Returns:
         Formatted prompt string for the CUA
     """
-    # Build product list for the prompt
+    working_dir = f"~/Downloads/{job_id}"
+    
+    # Build product list for the prompt with their upload URLs
     product_list = []
     for i, product in enumerate(products, 1):
-        entry = f"{i}. CPN: {product.cpn or 'N/A'}\n   Name: {product.name}"
+        cpn = product.cpn or 'N/A'
+        entry = f"{i}. CPN: {cpn}\n   Name: {product.name}"
         if product.supplier_name:
             entry += f"\n   Supplier: {product.supplier_name}"
         if product.supplier_asi:
             entry += f" (ASI: {product.supplier_asi})"
+        # Include the upload URL for this product
+        if cpn in upload_url_map:
+            entry += f"\n   Upload URL: {upload_url_map[cpn]}"
         product_list.append(entry)
     
     products_text = "\n".join(product_list)
     
-    prompt = f"""You are a product data extraction agent. Your goal is to log into ESP Plus, find each product listed below, and download their Distributor Report PDFs.
+    prompt = f"""You are a product data extraction agent. Your goal is to log into ESP Plus, find each product listed below, download their Distributor Report PDFs, and upload them to cloud storage.
 
 IMPORTANT CONTEXT:
 - You are controlling a Linux desktop environment
 - Firefox browser is available
-- You must save PDFs to: {REMOTE_DOWNLOAD_DIR}
-- Use descriptive filenames like: [CPN]_distributor_report.pdf (e.g., CPN-564949909_distributor_report.pdf)
+- You have Terminal access for file operations
+- Job ID: {job_id}
+- Working directory: {working_dir}
 
 ESP PLUS CREDENTIALS:
 - URL: {ESP_PLUS_URL}
@@ -114,7 +127,14 @@ PRODUCTS TO PROCESS ({len(products)} items)
 WORKFLOW
 =============================================================================
 
-PHASE 1: LOGIN TO ESP PLUS
+PHASE 1: SETUP WORKING DIRECTORY
+1. Open a Terminal (or use an existing one)
+2. Create the working directory:
+   mkdir -p {working_dir}
+3. Verify it was created:
+   ls -la ~/Downloads/
+
+PHASE 2: LOGIN TO ESP PLUS
 1. Open Firefox browser
 2. Navigate to: {ESP_PLUS_URL}
 3. Login using the credentials provided above:
@@ -123,7 +143,7 @@ PHASE 1: LOGIN TO ESP PLUS
 4. Wait for the dashboard to load
 5. Take a screenshot to confirm successful login
 
-PHASE 2: PROCESS EACH PRODUCT
+PHASE 3: PROCESS EACH PRODUCT
 For EACH product in the list above:
 
 1. SEARCH for the product:
@@ -139,34 +159,66 @@ For EACH product in the list above:
 3. DOWNLOAD THE DISTRIBUTOR REPORT:
    - Look for a "Print" button or menu
    - Select "Distributor Report" or similar option
-   - Save/Print as PDF to: {REMOTE_DOWNLOAD_DIR}
-   - Use filename format: [CPN]_distributor_report.pdf
-   - Example: CPN-564949909_distributor_report.pdf
+   - Wait for the download to complete (Firefox shows download popup)
+   - Take a screenshot to confirm download completed
 
-4. REPORT THE DOWNLOAD:
+4. IDENTIFY AND MOVE THE FILE:
+   - Go to Terminal
+   - Find the most recently downloaded PDF:
+     ls -lt ~/Downloads/*.pdf | head -n 2
+   - Move and rename it to the working directory:
+     mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/[CPN]_distributor_report.pdf
+   - Example: mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/CPN-564949909_distributor_report.pdf
+   - Verify the file exists:
+     ls -la {working_dir}/
+
+5. UPLOAD TO S3:
+   - Use the Upload URL provided for this CPN in the product list above
+   - Run the curl command:
+     curl -X PUT -T {working_dir}/[CPN]_distributor_report.pdf '[Upload URL for this CPN]'
+   - Verify the upload succeeded (HTTP 200 response)
+   - If curl fails, retry once
+
+6. REPORT THE DOWNLOAD:
    - Call the `report_downloaded_pdf` tool with:
      - sku: The product CPN (e.g., "CPN-564949909")
-     - remote_path: Full path to the saved PDF
+     - remote_path: "s3://{job_id}/products/[CPN]_distributor_report.pdf"
      - product_name: The product name
 
-5. HANDLE ERRORS:
+7. HANDLE ERRORS:
    - If a product cannot be found, call `log_error` with:
      - sku: The product CPN (or "unknown")
      - message: Description of what went wrong
    - Continue to the next product
 
-6. MOVE TO NEXT PRODUCT:
-   - Return to ESP Plus search
-   - Repeat steps 1-5 for the next item
+8. MOVE TO NEXT PRODUCT:
+   - Return to ESP Plus search (in Firefox)
+   - Repeat steps 1-7 for the next item
 
-PHASE 3: COMPLETION
+PHASE 4: COMPLETION
 After processing ALL products:
 1. Call `report_completion` with:
    - total_processed: Total number of products attempted
-   - successful: Number of PDFs successfully downloaded
+   - successful: Number of PDFs successfully downloaded and uploaded
    - failed: Number of products that failed
    - summary: Brief description of the session
 2. Take a final screenshot showing completion
+
+=============================================================================
+IMPORTANT COMMANDS REFERENCE
+=============================================================================
+
+Create working directory:
+  mkdir -p {working_dir}
+
+Find newest PDF in Downloads:
+  ls -t ~/Downloads/*.pdf | head -1
+
+Move file to working directory (replace [CPN] with actual CPN):
+  mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/[CPN]_distributor_report.pdf
+
+Upload to S3 (use the URL from product list):
+  curl -X PUT -T {working_dir}/[CPN]_distributor_report.pdf '[Upload URL]'
 
 =============================================================================
 SEARCH TIPS
@@ -202,7 +254,7 @@ DISTRIBUTOR REPORT DOWNLOAD TIPS
 3. **Saving the PDF**:
    - Browser may show a print dialog
    - Select "Save as PDF" or "Print to PDF"
-   - Ensure file is saved to {REMOTE_DOWNLOAD_DIR}
+   - Download typically goes to ~/Downloads by default
 
 =============================================================================
 AVAILABLE TOOLS
@@ -221,8 +273,9 @@ AVAILABLE TOOLS
 BEGIN WORKFLOW
 =============================================================================
 
-Start by taking a screenshot to see the current state of the desktop, then proceed with Phase 1.
+Start by taking a screenshot to see the current state of the desktop, then proceed with Phase 1 (Setup Working Directory).
 Be methodical and thorough. Process items one at a time.
+For each product: Download -> Move/Rename -> Upload -> Report -> Next.
 If you encounter errors, log them and continue with the next product.
 """
     
@@ -238,12 +291,14 @@ class ESPProductLookup:
     CUA Agent for looking up products in ESP+ and downloading sell sheets.
     
     This agent logs into ESP+, searches for each product in the provided list,
-    and downloads the Distributor Report PDF for each.
+    downloads the Distributor Report PDF for each, and uploads them to S3.
     """
     
     def __init__(
         self,
         products: List[Dict[str, Any]],
+        job_id: str,
+        upload_url_map: Dict[str, str],
         computer_id: Optional[str] = None,
         dry_run: bool = False
     ):
@@ -251,11 +306,15 @@ class ESPProductLookup:
         Initialize the ESP Product Lookup agent.
         
         Args:
-            products: List of products to look up (each should have 'sku' and 'name')
+            products: List of products to look up (each should have 'cpn' or 'sku' and 'name')
+            job_id: Unique job identifier for organizing files
+            upload_url_map: Dictionary mapping CPN to pre-signed S3 upload URL
             computer_id: Optional Orgo computer ID (defaults to ORGO_COMPUTER_ID)
             dry_run: If True, don't execute the CUA
         """
         self.products = self._normalize_products(products)
+        self.job_id = job_id
+        self.upload_url_map = upload_url_map
         self.computer_id = computer_id or ORGO_COMPUTER_ID
         self.dry_run = dry_run
         
@@ -291,7 +350,9 @@ class ESPProductLookup:
         logger.info("=" * 60)
         logger.info("ESP PRODUCT LOOKUP AGENT")
         logger.info("=" * 60)
+        logger.info(f"Job ID: {self.job_id}")
         logger.info(f"Products to process: {len(self.products)}")
+        logger.info(f"Upload URLs configured: {len(self.upload_url_map)}")
         logger.info(f"Dry run: {self.dry_run}")
         
         if self.dry_run:
@@ -321,7 +382,11 @@ class ESPProductLookup:
             logger.info(f"Connected to: orgo-{self.computer_id}.orgo.dev")
             
             # Build the prompt
-            prompt = build_lookup_prompt(self.products)
+            prompt = build_lookup_prompt(
+                products=self.products,
+                job_id=self.job_id,
+                upload_url_map=self.upload_url_map
+            )
             
             # Define progress callback
             def progress_callback(event_type: str, event_data: Any) -> None:
@@ -385,6 +450,7 @@ def main():
     """CLI entry point for testing the product lookup."""
     import argparse
     import json
+    from datetime import datetime
     
     parser = argparse.ArgumentParser(
         description="Look up products in ESP+ and download sell sheets"
@@ -393,6 +459,11 @@ def main():
         "products_json",
         type=str,
         help="Path to JSON file containing products list, or JSON string"
+    )
+    parser.add_argument(
+        "--job-id",
+        type=str,
+        help="Job ID (auto-generated if not provided)"
     )
     parser.add_argument(
         "--computer-id",
@@ -439,9 +510,29 @@ def main():
         print("Products must be a list", file=sys.stderr)
         sys.exit(1)
     
+    # Generate job ID if not provided
+    job_id = args.job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Initialize S3 handler and generate upload URLs for each product
+    from s3_handler import S3Handler
+    s3_handler = S3Handler(job_id=job_id)
+    
+    # Extract CPNs from products and generate upload URLs
+    cpns = []
+    for p in products:
+        cpn = p.get("cpn") or p.get("sku") or p.get("item_number") or ""
+        if cpn:
+            cpns.append(cpn)
+    
+    upload_url_map = s3_handler.generate_product_upload_urls(cpns)
+    
+    print(f"Generated {len(upload_url_map)} upload URLs for job: {job_id}")
+    
     # Run lookup
     lookup = ESPProductLookup(
         products=products,
+        job_id=job_id,
+        upload_url_map=upload_url_map,
         computer_id=args.computer_id,
         dry_run=args.dry_run
     )
@@ -455,7 +546,7 @@ def main():
     print(f"  Failed: {result.failed}")
     
     if result.downloaded_pdfs:
-        print(f"\nDownloaded PDFs:")
+        print(f"\nUploaded PDFs:")
         for pdf in result.downloaded_pdfs:
             print(f"  - {pdf['sku']}: {pdf['remote_path']}")
     

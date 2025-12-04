@@ -41,23 +41,33 @@ logger = logging.getLogger(__name__)
 # Prompt Builder
 # =============================================================================
 
-def build_download_prompt(presentation_url: str) -> str:
+def build_download_prompt(
+    presentation_url: str,
+    job_id: str,
+    upload_url: str
+) -> str:
     """
     Build the CUA prompt for downloading an ESP presentation PDF.
     
     Args:
         presentation_url: URL of the ESP presentation (portal.mypromooffice.com)
+        job_id: Unique job identifier for organizing files
+        upload_url: Pre-signed S3 URL for uploading the PDF
     
     Returns:
         Formatted prompt string for the CUA
     """
-    prompt = f"""You are a file download agent. Your goal is to navigate to an ESP presentation page and download the presentation as a PDF.
+    working_dir = f"~/Downloads/{job_id}"
+    target_file = f"{working_dir}/presentation.pdf"
+    
+    prompt = f"""You are a file download agent. Your goal is to navigate to an ESP presentation page, download the presentation as a PDF, and upload it to cloud storage.
 
 IMPORTANT CONTEXT:
 - You are controlling a Linux desktop environment
 - Firefox browser is available
-- You must save the PDF to: {REMOTE_DOWNLOAD_DIR}
-- Use a descriptive filename like: esp_presentation_[timestamp].pdf
+- You have Terminal access for file operations
+- Job ID: {job_id}
+- Working directory: {working_dir}
 
 TARGET URL:
 {presentation_url}
@@ -66,30 +76,68 @@ TARGET URL:
 WORKFLOW
 =============================================================================
 
-PHASE 1: NAVIGATE TO PRESENTATION
+PHASE 1: SETUP WORKING DIRECTORY
+1. Open a Terminal (or use an existing one)
+2. Create the working directory:
+   mkdir -p {working_dir}
+3. Verify it was created:
+   ls -la ~/Downloads/
+
+PHASE 2: NAVIGATE TO PRESENTATION
 1. Open Firefox browser
 2. Navigate to: {presentation_url}
 3. Wait for the page to fully load
 4. Take a screenshot to confirm the presentation is visible
 
-PHASE 2: DOWNLOAD THE PDF
+PHASE 3: DOWNLOAD THE PDF
 1. Look for a "Download PDF" button or similar download option
    - Common button labels: "Download PDF", "Export", "Print", "Save"
    - It may be in a toolbar, header, or as an action button
 2. Click the download button
-3. If a dialog appears, select PDF format
-4. Save the file to: {REMOTE_DOWNLOAD_DIR}
-5. Use filename format: esp_presentation_[date]_[time].pdf
-   - Example: esp_presentation_20250603_143052.pdf
+3. Wait for the download to complete
+   - Firefox will show a download popup/notification
+   - The download typically goes to ~/Downloads by default
+4. Take a screenshot to confirm download completed
 
-PHASE 3: VERIFY AND REPORT
-1. Verify the PDF was downloaded successfully
-2. Take a screenshot showing the download completed
-3. Call `report_downloaded_pdf` with:
+PHASE 4: IDENTIFY AND MOVE THE FILE
+1. Go to Terminal
+2. Find the most recently downloaded PDF:
+   ls -lt ~/Downloads/*.pdf | head -n 2
+3. The newest file is your downloaded presentation
+4. Move and rename it to the working directory:
+   mv "$(ls -t ~/Downloads/*.pdf | head -1)" {target_file}
+5. Verify the file exists:
+   ls -la {target_file}
+
+PHASE 5: UPLOAD TO S3
+1. Upload the file using curl:
+   curl -X PUT -T {target_file} '{upload_url}'
+2. Verify the upload succeeded (HTTP 200 response)
+3. If the curl command shows an error, retry once
+
+PHASE 6: VERIFY AND REPORT
+1. Take a screenshot showing the upload succeeded
+2. Call `report_downloaded_pdf` with:
    - sku: "presentation"
-   - remote_path: Full path to the saved PDF (e.g., {REMOTE_DOWNLOAD_DIR}/esp_presentation_20250603_143052.pdf)
+   - remote_path: "s3://{job_id}/presentation.pdf"
    - product_name: "ESP Presentation PDF"
-4. Call `report_completion` to signal you are done
+3. Call `report_completion` to signal you are done
+
+=============================================================================
+IMPORTANT COMMANDS REFERENCE
+=============================================================================
+
+Create working directory:
+  mkdir -p {working_dir}
+
+Find newest PDF in Downloads:
+  ls -t ~/Downloads/*.pdf | head -1
+
+Move file to working directory:
+  mv "$(ls -t ~/Downloads/*.pdf | head -1)" {target_file}
+
+Upload to S3:
+  curl -X PUT -T {target_file} '{upload_url}'
 
 =============================================================================
 TROUBLESHOOTING
@@ -110,7 +158,16 @@ If you encounter issues:
    - Try right-clicking and "Save as"
    - Use the browser's built-in PDF printer
 
-4. **Login required**:
+4. **No PDF found in Downloads**:
+   - List all files: ls -la ~/Downloads/
+   - Look for recently modified files: ls -lt ~/Downloads/ | head -5
+
+5. **curl upload fails**:
+   - Check the error message
+   - Verify the file exists: ls -la {target_file}
+   - Retry the curl command
+
+6. **Login required**:
    - Call `log_error` with details about the login requirement
    - We may need to handle authentication separately
 
@@ -131,7 +188,7 @@ AVAILABLE TOOLS
 BEGIN WORKFLOW
 =============================================================================
 
-Start by taking a screenshot to see the current state of the desktop, then proceed with Phase 1.
+Start by taking a screenshot to see the current state of the desktop, then proceed with Phase 1 (Setup Working Directory).
 """
     
     return prompt
@@ -154,13 +211,15 @@ class ESPPresentationDownloader:
     """
     CUA Agent for downloading ESP presentation PDFs.
     
-    This agent navigates to portal.mypromooffice.com presentation URLs
-    and downloads the presentation as a PDF.
+    This agent navigates to portal.mypromooffice.com presentation URLs,
+    downloads the presentation as a PDF, and uploads it to S3.
     """
     
     def __init__(
         self,
         presentation_url: str,
+        job_id: str,
+        upload_url: str,
         computer_id: Optional[str] = None,
         dry_run: bool = False
     ):
@@ -169,10 +228,14 @@ class ESPPresentationDownloader:
         
         Args:
             presentation_url: URL of the ESP presentation
+            job_id: Unique job identifier for organizing files
+            upload_url: Pre-signed S3 URL for uploading the PDF
             computer_id: Optional Orgo computer ID (defaults to ORGO_COMPUTER_ID)
             dry_run: If True, don't execute the CUA
         """
         self.presentation_url = presentation_url
+        self.job_id = job_id
+        self.upload_url = upload_url
         self.computer_id = computer_id or ORGO_COMPUTER_ID
         self.dry_run = dry_run
         
@@ -193,7 +256,9 @@ class ESPPresentationDownloader:
         logger.info("=" * 60)
         logger.info("ESP PRESENTATION DOWNLOADER")
         logger.info("=" * 60)
+        logger.info(f"Job ID: {self.job_id}")
         logger.info(f"URL: {self.presentation_url}")
+        logger.info(f"Upload URL: {self.upload_url[:80]}...")
         logger.info(f"Dry run: {self.dry_run}")
         
         if self.dry_run:
@@ -213,7 +278,11 @@ class ESPPresentationDownloader:
             logger.info(f"Connected to: orgo-{self.computer_id}.orgo.dev")
             
             # Build the prompt
-            prompt = build_download_prompt(self.presentation_url)
+            prompt = build_download_prompt(
+                presentation_url=self.presentation_url,
+                job_id=self.job_id,
+                upload_url=self.upload_url
+            )
             
             # Define progress callback
             def progress_callback(event_type: str, event_data: Any) -> None:
@@ -287,6 +356,7 @@ class ESPPresentationDownloader:
 def main():
     """CLI entry point for testing the downloader."""
     import argparse
+    from datetime import datetime
     
     parser = argparse.ArgumentParser(
         description="Download ESP presentation PDF using Orgo CUA"
@@ -295,6 +365,11 @@ def main():
         "url",
         type=str,
         help="URL of the ESP presentation"
+    )
+    parser.add_argument(
+        "--job-id",
+        type=str,
+        help="Job ID (auto-generated if not provided)"
     )
     parser.add_argument(
         "--computer-id",
@@ -324,9 +399,19 @@ def main():
     if "mypromooffice.com" not in args.url and "portal." not in args.url:
         print("Warning: URL does not appear to be from portal.mypromooffice.com", file=sys.stderr)
     
+    # Generate job ID if not provided
+    job_id = args.job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Initialize S3 handler and generate upload URL
+    from s3_handler import S3Handler
+    s3_handler = S3Handler(job_id=job_id)
+    upload_url = s3_handler.generate_presigned_upload_url("presentation.pdf")
+    
     # Run downloader
     downloader = ESPPresentationDownloader(
         presentation_url=args.url,
+        job_id=job_id,
+        upload_url=upload_url,
         computer_id=args.computer_id,
         dry_run=args.dry_run
     )
@@ -334,7 +419,7 @@ def main():
     result = downloader.run()
     
     if result.success:
-        print(f"Success! PDF downloaded to: {result.remote_path}")
+        print(f"Success! PDF uploaded to: {result.remote_path}")
     else:
         print(f"Failed: {result.error}", file=sys.stderr)
         sys.exit(1)

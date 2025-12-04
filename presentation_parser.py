@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-ViewPresentation.com Scraper
-============================
+ViewPresentation.com (SAGE) Scraper
+===================================
+Specific parser for SAGE presentations (viewpresentation.com).
 Uses SeleniumBase UC Mode to bypass bot detection, BeautifulSoup for parsing.
 
 Usage:
-    python scraper.py <url>
-    python scraper.py https://www.viewpresentation.com/66907679185
+    python presentation_parser.py <url>
+    python presentation_parser.py https://www.viewpresentation.com/66907679185
 """
 
 import json

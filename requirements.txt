@@ -16,6 +16,9 @@ wsproto
 trio
 trio-websocket
 
+# AWS S3
+boto3
+
 # HTTP/Networking
 requests
 urllib3

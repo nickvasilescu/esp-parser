@@ -75,13 +75,15 @@ Purpose: Who is the supplier? Where are they? How do you contact them?
 
 Schema:
 
-"vendor": {
+  "vendor": {
 
-  "name": null,
+    "name": null,
 
-  "asi": null,
+    "asi": null,
 
-  "line_name": null,
+    "website": null,
+
+    "line_name": null,
 
   "trade_name": null,
 
@@ -137,6 +139,10 @@ Guidelines:
 
   Supplier ASI number as a string. Example: "79530", "92413".
 
+- `vendor.website`
+
+  The vendor's website URL. This is CRITICAL for vendor matching/creation in Zoho. Example: "https://www.primeline.com", "primeline.com".
+
 - `vendor.line_name`  
 
   Brand or line name when present. Example: "Typhoon Golf". Set to null if not explicit.
@@ -183,13 +189,15 @@ Purpose: Core product identity and descriptive information.
 
 Schema:
 
-"item": {
+  "item": {
 
-  "vendor_sku": null,
+    "vendor_sku": null,
 
-  "cpn": null,
+    "mpn": null,
 
-  "name": null,
+    "cpn": null,
+
+    "name": null,
 
   "description_short": null,
 
@@ -232,6 +240,10 @@ Field details:
 - `item.vendor_sku`  
 
   The primary supplier item number, usually from "Product #". Example: "CE053", "LG603", "MPB-FXPRO-GB".
+
+- `item.mpn`
+
+  The Manufacturer Part Number (MPN). This is CRITICAL for Purchase Orders and vendor mapping. Often same as Vendor SKU but sometimes distinct.
 
 - `item.cpn`  
 

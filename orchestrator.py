@@ -222,6 +222,7 @@ def run_sage_pipeline(
 
 def run_esp_pipeline(
     url: str,
+    job_id: str,
     computer_id: Optional[str] = None,
     dry_run: bool = False,
     skip_cua: bool = False
@@ -230,14 +231,15 @@ def run_esp_pipeline(
     Execute the ESP pipeline.
     
     Flow:
-    1. CUA downloads presentation PDF from portal.mypromooffice.com
+    1. CUA downloads presentation PDF from portal.mypromooffice.com and uploads to S3
     2. pdf_processor extracts product list from presentation PDF
-    3. CUA logs into ESP+ and downloads Distributor Report for each product
+    3. CUA logs into ESP+ and downloads Distributor Report for each product to S3
     4. pdf_processor extracts full product data from each sell sheet
     5. Return aggregated structured output
     
     Args:
         url: ESP presentation URL
+        job_id: Unique job identifier for S3 organization
         computer_id: Orgo computer ID
         dry_run: If True, skip CUA execution
         skip_cua: If True, use existing PDFs
@@ -250,18 +252,24 @@ def run_esp_pipeline(
     from pdf_processor import process_pdf, process_presentation_pdf
     from prompt import EXTRACTION_PROMPT
     from prompt_presentation import PRESENTATION_EXTRACTION_PROMPT
+    from s3_handler import S3Handler
     
     logger.info("=" * 60)
     logger.info("ESP PIPELINE")
     logger.info("=" * 60)
+    logger.info(f"Job ID: {job_id}")
     logger.info(f"URL: {url}")
     
     errors = []
     
+    # Initialize S3 handler
+    s3_handler = S3Handler(job_id=job_id)
+    logger.info(f"S3 bucket: {s3_handler.bucket}")
+    
     # Ensure output directory exists
     output_dir = Path(OUTPUT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
-    pdfs_dir = output_dir / "pdfs"
+    pdfs_dir = output_dir / "pdfs" / job_id
     pdfs_dir.mkdir(parents=True, exist_ok=True)
     
     # =========================================================================
@@ -277,15 +285,28 @@ def run_esp_pipeline(
         logger.info("[DRY RUN] Skipping presentation download")
     elif skip_cua:
         # Look for existing presentation PDF
-        existing_pdfs = list(pdfs_dir.glob("esp_presentation*.pdf"))
+        existing_pdfs = list(pdfs_dir.glob("presentation*.pdf"))
         if existing_pdfs:
             presentation_pdf_path = str(existing_pdfs[0])
             logger.info(f"Using existing presentation PDF: {presentation_pdf_path}")
         else:
-            logger.warning("No existing presentation PDF found")
+            # Try to download from S3
+            try:
+                local_path = str(pdfs_dir / "presentation.pdf")
+                s3_handler.download_file("presentation.pdf", local_path)
+                presentation_pdf_path = local_path
+                logger.info(f"Downloaded presentation PDF from S3: {local_path}")
+            except FileNotFoundError:
+                logger.warning("No existing presentation PDF found in S3")
     else:
+        # Generate pre-signed upload URL for the presentation PDF
+        upload_url = s3_handler.generate_presigned_upload_url("presentation.pdf")
+        logger.info(f"Generated upload URL for presentation.pdf")
+        
         downloader = ESPPresentationDownloader(
             presentation_url=url,
+            job_id=job_id,
+            upload_url=upload_url,
             computer_id=computer_id,
             dry_run=dry_run
         )
@@ -293,11 +314,20 @@ def run_esp_pipeline(
         download_result = downloader.run()
         
         if download_result.success:
-            # TODO: Retrieve file from Orgo VM
-            # For now, record the remote path
-            logger.info(f"Presentation PDF downloaded to VM: {download_result.remote_path}")
-            # Placeholder: Would retrieve file here
-            # presentation_pdf_path = retrieve_from_vm(download_result.remote_path)
+            logger.info(f"Presentation PDF uploaded to S3: {download_result.remote_path}")
+            
+            # Download the file from S3 to local
+            try:
+                local_path = str(pdfs_dir / "presentation.pdf")
+                s3_handler.download_file("presentation.pdf", local_path)
+                presentation_pdf_path = local_path
+                logger.info(f"Downloaded presentation PDF from S3 to: {local_path}")
+            except Exception as e:
+                errors.append({
+                    "step": "presentation_download_s3",
+                    "message": f"Failed to download from S3: {str(e)}"
+                })
+                logger.error(f"Failed to download presentation PDF from S3: {e}")
         else:
             errors.append({
                 "step": "presentation_download",
@@ -369,17 +399,41 @@ def run_esp_pipeline(
     logger.info("=" * 60)
     
     downloaded_product_pdfs = []
+    products_dir = pdfs_dir / "products"
+    products_dir.mkdir(parents=True, exist_ok=True)
     
     if dry_run:
         logger.info("[DRY RUN] Skipping ESP+ product lookups")
     elif skip_cua:
-        # Look for existing product PDFs
-        existing_pdfs = list(pdfs_dir.glob("*_distributor_report.pdf"))
-        downloaded_product_pdfs = [str(p) for p in existing_pdfs]
-        logger.info(f"Found {len(downloaded_product_pdfs)} existing product PDFs")
+        # Look for existing product PDFs locally first
+        existing_pdfs = list(products_dir.glob("*_distributor_report.pdf"))
+        if existing_pdfs:
+            downloaded_product_pdfs = [str(p) for p in existing_pdfs]
+            logger.info(f"Found {len(downloaded_product_pdfs)} existing product PDFs locally")
+        else:
+            # Try to download from S3
+            try:
+                downloaded_files = s3_handler.download_directory("products", str(products_dir))
+                downloaded_product_pdfs = downloaded_files
+                logger.info(f"Downloaded {len(downloaded_product_pdfs)} product PDFs from S3")
+            except Exception as e:
+                logger.warning(f"Could not download from S3: {e}")
     elif products_to_lookup:
+        # Extract CPNs from products list
+        cpns = []
+        for p in products_to_lookup:
+            cpn = p.get("cpn") or p.get("sku") or p.get("item_number") or ""
+            if cpn:
+                cpns.append(cpn)
+        
+        # Generate pre-signed upload URLs for each product
+        upload_url_map = s3_handler.generate_product_upload_urls(cpns)
+        logger.info(f"Generated {len(upload_url_map)} upload URLs for products")
+        
         lookup = ESPProductLookup(
             products=products_to_lookup,
+            job_id=job_id,
+            upload_url_map=upload_url_map,
             computer_id=computer_id,
             dry_run=dry_run
         )
@@ -388,13 +442,21 @@ def run_esp_pipeline(
         
         logger.info(f"Lookup complete: {lookup_result.successful}/{lookup_result.total_products} successful")
         
-        # TODO: Retrieve files from Orgo VM
-        # For now, record the results
+        # Download all product PDFs from S3
         for pdf_info in lookup_result.downloaded_pdfs:
-            logger.info(f"  Downloaded: {pdf_info['sku']} -> {pdf_info['remote_path']}")
-            # Placeholder: Would retrieve file here
-            # local_path = retrieve_from_vm(pdf_info['remote_path'])
-            # downloaded_product_pdfs.append(local_path)
+            logger.info(f"  Uploaded to S3: {pdf_info['sku']} -> {pdf_info['remote_path']}")
+        
+        # Batch download all product PDFs from S3
+        try:
+            downloaded_files = s3_handler.download_directory("products", str(products_dir))
+            downloaded_product_pdfs = downloaded_files
+            logger.info(f"Downloaded {len(downloaded_product_pdfs)} product PDFs from S3")
+        except Exception as e:
+            errors.append({
+                "step": "product_download_s3",
+                "message": f"Failed to download products from S3: {str(e)}"
+            })
+            logger.error(f"Failed to download product PDFs from S3: {e}")
         
         for error in lookup_result.errors:
             errors.append({
@@ -468,6 +530,7 @@ class Orchestrator:
         self,
         url: str,
         computer_id: Optional[str] = None,
+        job_id: Optional[str] = None,
         dry_run: bool = False,
         skip_cua: bool = False
     ):
@@ -477,6 +540,7 @@ class Orchestrator:
         Args:
             url: Presentation URL (SAGE or ESP)
             computer_id: Optional Orgo computer ID for ESP pipeline
+            job_id: Optional job ID (auto-generated if not provided)
             dry_run: If True, skip actual processing
             skip_cua: If True, use existing PDFs
         """
@@ -484,6 +548,9 @@ class Orchestrator:
         self.computer_id = computer_id
         self.dry_run = dry_run
         self.skip_cua = skip_cua
+        
+        # Generate or use provided job ID
+        self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         # Detect presentation type
         self.presentation_type = detect_presentation_type(url)
@@ -503,6 +570,7 @@ class Orchestrator:
         logger.info("=" * 60)
         logger.info("MULTI-SOURCE ORCHESTRATOR")
         logger.info("=" * 60)
+        logger.info(f"Job ID: {self.job_id}")
         logger.info(f"URL: {self.url}")
         logger.info(f"Detected Type: {self.presentation_type.value}")
         logger.info(f"Dry Run: {self.dry_run}")
@@ -521,6 +589,7 @@ class Orchestrator:
         elif self.presentation_type == PresentationType.ESP:
             result = run_esp_pipeline(
                 url=self.url,
+                job_id=self.job_id,
                 computer_id=self.computer_id,
                 dry_run=self.dry_run,
                 skip_cua=self.skip_cua
@@ -588,6 +657,10 @@ Environment Variables:
   ORGO_COMPUTER_ID      Default Orgo computer ID
   ESP_PLUS_EMAIL        ESP+ login email
   ESP_PLUS_PASSWORD     ESP+ login password
+  AWS_ACCESS_KEY_ID     AWS access key ID (required for ESP pipeline)
+  AWS_SECRET_ACCESS_KEY AWS secret access key (required for ESP pipeline)
+  AWS_REGION            AWS region (default: us-east-1)
+  AWS_S3_BUCKET         S3 bucket name for file storage (required for ESP pipeline)
   SAGE_API_KEY          SAGE API key (optional, for future enrichment)
   SAGE_API_SECRET       SAGE API secret (optional)
         """
@@ -603,6 +676,12 @@ Environment Variables:
         "--computer-id",
         type=str,
         help="Orgo computer ID to use (overrides ORGO_COMPUTER_ID env var)"
+    )
+    
+    parser.add_argument(
+        "--job-id",
+        type=str,
+        help="Job ID for S3 organization (auto-generated if not provided)"
     )
     
     parser.add_argument(
@@ -639,6 +718,7 @@ Environment Variables:
     orchestrator = Orchestrator(
         url=args.url,
         computer_id=args.computer_id,
+        job_id=args.job_id,
         dry_run=args.dry_run,
         skip_cua=args.skip_cua
     )

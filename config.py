@@ -42,10 +42,23 @@ DISPLAY_HEIGHT: int = int(os.getenv("DISPLAY_HEIGHT", "768"))
 
 ESP_PLUS_EMAIL: Optional[str] = os.getenv("ESP_PLUS_EMAIL")
 ESP_PLUS_PASSWORD: Optional[str] = os.getenv("ESP_PLUS_PASSWORD")
-ESP_PLUS_URL: str = os.getenv("ESP_PLUS_URL", "https://espplus.asicentral.com")
+ESP_PLUS_URL: str = os.getenv("ESP_PLUS_URL", "https://espplus.com")
 
 # ESP Presentation Portal
 ESP_PORTAL_URL: str = os.getenv("ESP_PORTAL_URL", "https://portal.mypromooffice.com")
+
+
+# =============================================================================
+# AWS S3 Configuration
+# =============================================================================
+
+AWS_ACCESS_KEY_ID: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
+AWS_S3_BUCKET: Optional[str] = os.getenv("AWS_S3_BUCKET")
+
+# Pre-signed URL expiration time in seconds (default: 1 hour)
+S3_URL_EXPIRATION: int = int(os.getenv("S3_URL_EXPIRATION", "3600"))
 
 
 # =============================================================================
@@ -117,6 +130,16 @@ def validate_config() -> None:
     if not ESP_PLUS_PASSWORD:
         errors.append("ESP_PLUS_PASSWORD environment variable is required")
     
+    # Check required AWS S3 configuration
+    if not AWS_ACCESS_KEY_ID:
+        errors.append("AWS_ACCESS_KEY_ID environment variable is required")
+    
+    if not AWS_SECRET_ACCESS_KEY:
+        errors.append("AWS_SECRET_ACCESS_KEY environment variable is required")
+    
+    if not AWS_S3_BUCKET:
+        errors.append("AWS_S3_BUCKET environment variable is required")
+    
     # Report all errors
     if errors:
         print("Configuration Error(s):", file=sys.stderr)
@@ -132,6 +155,7 @@ def get_config_summary() -> str:
     Sensitive values are masked.
     """
     sage_api_status = "Configured" if SAGE_API_KEY else "Not configured (pending)"
+    aws_key_masked = f"{AWS_ACCESS_KEY_ID[:4]}...{AWS_ACCESS_KEY_ID[-4:]}" if AWS_ACCESS_KEY_ID and len(AWS_ACCESS_KEY_ID) > 8 else "Not set"
     
     return f"""
 Multi-Source Orchestration Configuration:
@@ -147,6 +171,12 @@ Multi-Source Orchestration Configuration:
   SAGE Pipeline:
     - API Status: {sage_api_status}
     - Presentation Domain: {SAGE_PRESENTATION_DOMAIN}
+  
+  AWS S3:
+    - Access Key: {aws_key_masked}
+    - Region: {AWS_REGION}
+    - Bucket: {AWS_S3_BUCKET}
+    - URL Expiration: {S3_URL_EXPIRATION}s
   
   Agent:
     - Model: {MODEL_ID}

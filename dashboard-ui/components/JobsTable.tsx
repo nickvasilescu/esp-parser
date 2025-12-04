@@ -1,0 +1,101 @@
+"use client";
+
+import React from "react";
+import { Job } from "../data/mockData";
+import StatusBadge from "./StatusBadge";
+import ProgressBar from "./ProgressBar";
+import { ChevronRight, Search } from "lucide-react";
+
+// Format time consistently to avoid hydration mismatches
+function formatTime(isoString: string): string {
+  const date = new Date(isoString);
+  const hours = date.getUTCHours();
+  const minutes = date.getUTCMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours % 12 || 12;
+  const displayMinutes = minutes.toString().padStart(2, "0");
+  return `${displayHours}:${displayMinutes} ${ampm}`;
+}
+
+interface JobsTableProps {
+  jobs: Job[];
+  onSelectJob: (job: Job) => void;
+}
+
+export default function JobsTable({ jobs, onSelectJob }: JobsTableProps) {
+  return (
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <div className="p-4 border-b border-border flex items-center justify-between">
+        <h3 className="font-medium text-foreground">Active Workflows</h3>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1.5 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search jobs..."
+            className="pl-9 pr-4 py-1.5 bg-secondary rounded-md border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500 w-64"
+          />
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-secondary/50 text-muted-foreground font-medium">
+            <tr>
+              <th className="px-4 py-3 w-[140px]">Status</th>
+              <th className="px-4 py-3">Platform</th>
+              <th className="px-4 py-3">Product ID</th>
+              <th className="px-4 py-3 w-[200px]">Progress</th>
+              <th className="px-4 py-3">Started</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {jobs.map((job) => (
+              <tr
+                key={job.id}
+                className="hover:bg-secondary/30 transition-colors cursor-pointer group"
+                onClick={() => onSelectJob(job)}
+              >
+                <td className="px-4 py-3">
+                  <StatusBadge status={job.status} />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        job.platform === "ESP" ? "bg-red-500" : "bg-green-500"
+                      }`}
+                    />
+                    <span className="font-medium">{job.platform}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 font-mono text-muted-foreground">
+                  {job.product_id}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground text-right">
+                      {job.progress}%
+                    </span>
+                    <ProgressBar progress={job.progress} />
+                  </div>
+                </td>
+                <td
+                  className="px-4 py-3 text-muted-foreground"
+                  suppressHydrationWarning
+                >
+                  {formatTime(job.created_at)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md opacity-0 group-hover:opacity-100 transition-all">
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
