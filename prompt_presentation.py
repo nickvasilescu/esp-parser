@@ -124,9 +124,11 @@ PRESENTATION OBJECT:
 
 - `presentation.presenter_email`
   Email address of the presenter.
+  Example: "koell@stblstrategies.com"
 
 - `presentation.presenter_phone`
   Phone number of the presenter.
+  Example: "1-316-640-2262"
 
 - `presentation.date`
   Date of the presentation if shown (as a string).

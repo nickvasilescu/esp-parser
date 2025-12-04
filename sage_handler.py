@@ -4,7 +4,7 @@ SAGE Presentation Handler
 =========================
 
 Handles SAGE presentation links (viewpresentation.com).
-Uses presentation_parser.py for scraping and includes placeholder for SAGE API integration.
+Uses SAGE Connect API for data extraction.
 
 Usage:
     from sage_handler import SAGEHandler
@@ -13,14 +13,35 @@ Usage:
     result = handler.process()
 """
 
+import json
 import logging
+import os
+import re
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-
-from presentation_parser import scrape as scrape_presentation, Presentation
+import httpx
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+# SAGE API Configuration - Default credentials (can be overridden via env vars)
+# SAGE Connect API endpoint
+# From docs: https://www.promoplace.com/ws/ws.dll/ConnectAPI
+# Requires TLS 1.2 encryption
+SAGE_API_URL = os.getenv("SAGE_API_URL", "https://www.promoplace.com/ws/ws.dll/ConnectAPI")
+SAGE_ACCT_ID = int(os.getenv("SAGE_ACCT_ID", "270178"))
+SAGE_LOGIN_ID = os.getenv("SAGE_LOGIN_ID", "System")
+SAGE_AUTH_KEY = os.getenv("SAGE_AUTH_KEY", "d5ecbc5d702fe54188265e8f513ed0af")
+
+# API Service IDs
+SERVICE_PRESENTATION = 301
+SERVICE_PRODUCT_DETAIL = 105
+API_VERSION = 130
 
 
 # =============================================================================
@@ -28,19 +49,108 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 @dataclass
+class SAGEVendor:
+    """Vendor/Supplier information from SAGE."""
+    sage_id: Optional[str] = None
+    name: Optional[str] = None
+    line_name: Optional[str] = None
+    website: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    my_customer_number: Optional[str] = None  # Koell's customer # with this supplier
+    my_cs_rep: Optional[str] = None
+    my_cs_rep_email: Optional[str] = None
+
+
+@dataclass
+class SAGEPriceBreak:
+    """Price break/tier from SAGE."""
+    quantity: int
+    catalog_price: float
+    sell_price: float
+    net_cost: float
+
+
+@dataclass
 class SAGEProduct:
     """Normalized product from SAGE presentation."""
-    sku: str
-    name: str
-    description: str
-    supplier_name: Optional[str] = None
+    # Identifiers
+    pres_item_id: int
+    prod_id: Optional[int] = None
+    internal_item_num: Optional[str] = None  # This is the MPN for Zoho!
+    spc: Optional[str] = None  # SAGE Product Code
+    item_num: Optional[str] = None  # Display item number
+    
+    # Basic info
+    name: str = ""
+    description: str = ""
+    category: Optional[str] = None
+    
+    # Pricing
+    price_breaks: List[SAGEPriceBreak] = field(default_factory=list)
+    price_includes: Optional[str] = None
+    price_code: Optional[str] = None
+    
+    # Charges
+    setup_charge: float = 0.0
+    setup_charge_code: Optional[str] = None
+    repeat_charge: float = 0.0
+    screen_charge: float = 0.0
+    proof_charge: float = 0.0
+    pms_charge: float = 0.0
+    spec_sample_charge: float = 0.0
+    copy_change_charge: float = 0.0
+    additional_charges_text: Optional[str] = None
+    
+    # Product details
     colors: List[str] = field(default_factory=list)
-    price_breaks: List[Dict[str, Any]] = field(default_factory=list)
-    decoration_info: Optional[str] = None
+    color_info_text: Optional[str] = None
+    imprint_info_text: Optional[str] = None
+    packaging_text: Optional[str] = None
     dimensions: Optional[str] = None
+    
+    # Shipping
+    ship_point: Optional[str] = None
+    units_per_carton: Optional[int] = None
+    weight_per_carton: Optional[float] = None
+    
+    # Supplier
+    supplier: Optional[SAGEVendor] = None
+    
+    # Images
     image_urls: List[str] = field(default_factory=list)
-    # Fields that would come from SAGE API (placeholder)
-    full_details: Optional[Dict[str, Any]] = None
+    
+    # Catalog info
+    cat_year: Optional[str] = None
+    cat_expires: Optional[str] = None
+
+
+@dataclass
+class SAGEClient:
+    """Client information from SAGE presentation."""
+    client_id: Optional[int] = None
+    name: Optional[str] = None
+    company: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address1: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    tax_rate: Optional[str] = None
+
+
+@dataclass
+class SAGEPresenter:
+    """Presenter information (always Koell/STBL Strategies)."""
+    name: str = "Koell Collins"
+    company: str = "STBL Strategies"
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
 
 
 @dataclass
@@ -48,118 +158,420 @@ class SAGEResult:
     """Result of SAGE presentation processing."""
     success: bool
     presentation_url: str
-    presentation_title: Optional[str]
-    client_name: Optional[str]
-    client_company: Optional[str]
-    presenter_name: Optional[str]
-    presenter_company: Optional[str]
+    pres_id: Optional[int] = None
+    presentation_title: Optional[str] = None
+    presentation_date: Optional[str] = None
+    client: Optional[SAGEClient] = None
+    presenter: Optional[SAGEPresenter] = None
     products: List[SAGEProduct] = field(default_factory=list)
-    api_enriched: bool = False
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
-# SAGE API Placeholder
+# SAGE API Client
 # =============================================================================
 
 class SAGEAPIClient:
     """
-    Placeholder for SAGE API integration.
+    Client for SAGE Connect API.
     
-    This class will be implemented when SAGE developer API access is available.
-    For now, it provides stub methods that log placeholder messages.
-    
-    Expected endpoints (based on promo industry standards):
-    - Product search
-    - Product details
-    - Pricing information
-    - Decoration options
-    - Vendor information
+    Handles authentication and API calls to SAGE services.
     """
     
-    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+    def __init__(
+        self,
+        acct_id: int = SAGE_ACCT_ID,
+        login_id: str = SAGE_LOGIN_ID,
+        auth_key: str = SAGE_AUTH_KEY,
+        api_url: str = SAGE_API_URL,
+        session_id: Optional[str] = None
+    ):
         """
         Initialize SAGE API client.
         
         Args:
-            api_key: SAGE API key (future)
-            api_secret: SAGE API secret (future)
+            acct_id: SAGE account ID
+            login_id: SAGE login ID
+            auth_key: SAGE authentication key
+            api_url: SAGE API endpoint URL
+            session_id: Optional session ID from sagemember.com login
         """
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.base_url = "https://api.sageworld.com"  # Placeholder URL
-        self._initialized = False
+        self.acct_id = acct_id
+        self.login_id = login_id
+        self.auth_key = auth_key
+        self.api_url = api_url
+        self.session_id = session_id or os.getenv("SAGE_SESSION_ID", "")
         
-        if api_key and api_secret:
-            logger.info("SAGE API credentials provided (not yet implemented)")
-            self._initialized = True
-        else:
-            logger.info("SAGE API credentials not provided - API features disabled")
+        # Build cookies if session ID is provided
+        cookies = {}
+        if self.session_id:
+            cookies[f"{acct_id}AdminSessionID"] = self.session_id
+            cookies["DefaultAdminSessionID"] = self.session_id
+        
+        self._client = httpx.Client(timeout=60.0, cookies=cookies)
     
-    def is_available(self) -> bool:
-        """Check if SAGE API is available and configured."""
-        return self._initialized
+    def _build_auth(self) -> Dict[str, Any]:
+        """Build authentication object for API requests."""
+        return {
+            "acctId": self.acct_id,
+            "loginId": self.login_id,
+            "key": self.auth_key
+        }
     
-    def get_product_details(self, sku: str) -> Optional[Dict[str, Any]]:
+    def _call_api(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Get full product details from SAGE API.
+        Make an API call to SAGE.
         
         Args:
-            sku: Product SKU/item number
+            request_data: Request payload
             
         Returns:
-            Product details dictionary, or None if not available
-        
-        TODO: Implement when SAGE API access is available.
-        Expected data:
-        - Full product specifications
-        - Complete pricing tiers
-        - All decoration options
-        - Vendor contact information
-        - Inventory status
+            API response as dictionary
+            
+        Raises:
+            Exception: If API call fails
         """
-        logger.warning(
-            f"SAGE API not implemented. Would fetch details for SKU: {sku}. "
-            "Awaiting SAGE developer API credentials."
+        logger.info(f"SAGE API URL: {self.api_url}")
+        logger.debug(f"SAGE API Request: {json.dumps(request_data, indent=2)}")
+        
+        response = self._client.post(
+            self.api_url,
+            json=request_data,
+            headers={"Content-Type": "application/json"}
         )
+        
+        logger.info(f"SAGE API Response Status: {response.status_code}")
+        logger.info(f"SAGE API Response Headers: {dict(response.headers)}")
+        
+        # Log raw response for debugging
+        raw_text = response.text[:500] if response.text else "(empty)"
+        logger.info(f"SAGE API Response Body (first 500 chars): {raw_text}")
+        
+        response.raise_for_status()
+        
+        if not response.text:
+            raise Exception("SAGE API returned empty response")
+        
+        result = response.json()
+        logger.debug(f"SAGE API Response OK: {result.get('ok', False)}")
+        
+        if not result.get("ok", False):
+            raise Exception(f"SAGE API error: {result}")
+        
+        return result
+    
+    def get_presentation(self, pres_id: int) -> Dict[str, Any]:
+        """
+        Get a specific presentation by ID.
+        
+        Args:
+            pres_id: Presentation ID
+            
+        Returns:
+            Presentation data
+        """
+        request = {
+            "serviceId": SERVICE_PRESENTATION,
+            "apiVer": API_VERSION,
+            "auth": self._build_auth(),
+            "search": {
+                "presId": [pres_id]
+            }
+        }
+        
+        result = self._call_api(request)
+        presentations = result.get("presentations", [])
+        
+        if not presentations:
+            raise Exception(f"Presentation {pres_id} not found")
+        
+        return presentations[0]
+    
+    def get_product_detail(self, prod_e_id: int, include_supplier: bool = True) -> Dict[str, Any]:
+        """
+        Get full product details.
+        
+        Args:
+            prod_e_id: Product encrypted ID
+            include_supplier: Whether to include supplier info
+            
+        Returns:
+            Product details
+        """
+        request = {
+            "serviceId": SERVICE_PRODUCT_DETAIL,
+            "apiVer": API_VERSION,
+            "auth": self._build_auth(),
+            "prodEId": prod_e_id,
+            "includeSuppInfo": 1 if include_supplier else 0
+        }
+        
+        result = self._call_api(request)
+        return result.get("product", {})
+    
+    def close(self):
+        """Close the HTTP client."""
+        self._client.close()
+
+
+# =============================================================================
+# URL Parser
+# =============================================================================
+
+def extract_pres_id_from_url(url: str) -> int:
+    """
+    Extract presentation ID from viewpresentation.com URL.
+    
+    The URL format is: https://www.viewpresentation.com/XXXXXXXXXXX
+    Where the number contains the presId (typically after stripping a prefix).
+    
+    Examples:
+        URL: 66907679185 → presId: 7679185 (strip first 4 chars)
+    
+    Args:
+        url: Full viewpresentation.com URL
+        
+    Returns:
+        Presentation ID
+        
+    Raises:
+        ValueError: If URL format is invalid
+    """
+    # Extract the number from URL
+    match = re.search(r'viewpresentation\.com/(\d+)', url)
+    if not match:
+        raise ValueError(f"Invalid SAGE presentation URL: {url}")
+    
+    url_number = match.group(1)
+    
+    # The presId is embedded - strip first 4 chars for URLs with prefix
+    # URL: 66907679185 → presId: 7679185
+    if len(url_number) > 7:
+        pres_id = int(url_number[4:])
+    else:
+        pres_id = int(url_number)
+    
+    logger.info(f"Extracted presId {pres_id} from URL number {url_number}")
+    return pres_id
+
+
+# =============================================================================
+# Response Parser
+# =============================================================================
+
+def parse_presentation_response(data: Dict[str, Any], url: str) -> SAGEResult:
+    """
+    Parse SAGE API presentation response into SAGEResult.
+    
+    Args:
+        data: Raw API response for a single presentation
+        url: Original presentation URL
+        
+    Returns:
+        Parsed SAGEResult
+    """
+    # Extract presentation metadata
+    general = data.get("general", {})
+    pres_id = data.get("presId")
+    
+    # Parse client info
+    client_data = data.get("client", {})
+    client = SAGEClient(
+        client_id=client_data.get("clientId"),
+        name=client_data.get("name"),
+        company=client_data.get("clientCompany") or client_data.get("company"),
+        email=client_data.get("email") or None,
+        phone=client_data.get("phone") or None,
+        address1=client_data.get("address1") or None,
+        city=client_data.get("city") or None,
+        state=client_data.get("state") or None,
+        zip_code=client_data.get("zip") or None,
+        tax_rate=client_data.get("taxRate") or None
+    )
+    
+    # Parse presenter info (always Koell Collins / STBL Strategies)
+    header = data.get("header", {})
+    header_text = header.get("headFirstText", "")
+    
+    presenter = SAGEPresenter(
+        name="Koell Collins",
+        company="STBL Strategies"
+    )
+    
+    # Extract phone and location from header if available
+    header_lines = header_text.split("\r\n") if header_text else []
+    if len(header_lines) >= 3:
+        presenter.phone = header_lines[2] if len(header_lines) > 2 else None
+    if len(header_lines) >= 4:
+        presenter.location = header_lines[3] if len(header_lines) > 3 else None
+    
+    # Extract website from additional header
+    head_addtl = header.get("headAddtlText", "")
+    if "stblstrategies.com" in head_addtl:
+        presenter.website = "www.stblstrategies.com"
+    
+    # Parse products
+    products = []
+    for item in data.get("items", []):
+        product = parse_item(item)
+        products.append(product)
+    
+    # Build result
+    return SAGEResult(
+        success=True,
+        presentation_url=url,
+        pres_id=pres_id,
+        presentation_title=general.get("title"),
+        presentation_date=general.get("date"),
+        client=client,
+        presenter=presenter,
+        products=products,
+        metadata={
+            "source": "sage_api",
+            "processed_at": datetime.now().isoformat(),
+            "item_count": len(products),
+            "api_version": API_VERSION
+        }
+    )
+
+
+def parse_item(item: Dict[str, Any]) -> SAGEProduct:
+    """
+    Parse a single item from SAGE presentation response.
+    
+    Args:
+        item: Item data from API response
+        
+    Returns:
+        Parsed SAGEProduct
+    """
+    # Parse price breaks
+    price_breaks = []
+    qtys = item.get("qtys", [])
+    cat_prcs = item.get("catPrcs", [])
+    sell_prcs = item.get("sellPrcs", [])
+    costs = item.get("costs", [])
+    
+    for i in range(len(qtys)):
+        qty_str = qtys[i] if i < len(qtys) else ""
+        if not qty_str or qty_str == "0":
+            continue
+        
+        try:
+            qty = int(qty_str.replace(",", ""))
+            cat_price = float(cat_prcs[i]) if i < len(cat_prcs) and cat_prcs[i] else 0.0
+            sell_price = float(sell_prcs[i]) if i < len(sell_prcs) and sell_prcs[i] else 0.0
+            cost = float(costs[i]) if i < len(costs) and costs[i] else 0.0
+            
+            if qty > 0:
+                price_breaks.append(SAGEPriceBreak(
+                    quantity=qty,
+                    catalog_price=cat_price,
+                    sell_price=sell_price,
+                    net_cost=cost
+                ))
+        except (ValueError, IndexError):
+            continue
+    
+    # Parse supplier
+    supplier_data = item.get("supplier", {})
+    supplier = SAGEVendor(
+        sage_id=supplier_data.get("sageId"),
+        name=supplier_data.get("company"),
+        line_name=supplier_data.get("line"),
+        website=supplier_data.get("web"),
+        email=supplier_data.get("email"),
+        phone=supplier_data.get("phone"),
+        city=supplier_data.get("city"),
+        state=supplier_data.get("state"),
+        zip_code=supplier_data.get("zip"),
+        my_customer_number=supplier_data.get("myCustNum") or None,
+        my_cs_rep=supplier_data.get("myCsRep") or None,
+        my_cs_rep_email=supplier_data.get("myCsRepEmail") or None
+    )
+    
+    # Parse colors from colorInfoText
+    color_text = item.get("colorInfoText", "")
+    colors = [c.strip() for c in color_text.split(",") if c.strip()] if color_text else []
+    
+    # Parse image URLs
+    image_urls = [pic.get("URL") or pic.get("url") for pic in item.get("pics", []) if pic.get("URL") or pic.get("url")]
+    
+    # Parse dimensions from description
+    description = item.get("description", "")
+    dimensions = extract_dimensions_from_text(description)
+    
+    # Parse carton info
+    units_per_carton = None
+    weight_per_carton = None
+    try:
+        upc = item.get("unitsPerCtn", "0")
+        units_per_carton = int(upc) if upc and upc != "0" else None
+        wpc = item.get("weightPerCtn", "0")
+        weight_per_carton = float(wpc) if wpc and wpc != "0" else None
+    except ValueError:
+        pass
+    
+    return SAGEProduct(
+        pres_item_id=item.get("presItemId", 0),
+        prod_id=item.get("prodId"),
+        internal_item_num=item.get("internalItemNum"),  # This is the MPN!
+        spc=item.get("spc"),
+        item_num=item.get("itemNum"),
+        name=item.get("name", ""),
+        description=description,
+        category=item.get("category"),
+        price_breaks=price_breaks,
+        price_includes=item.get("priceIncludes") or None,
+        price_code=item.get("priceCode"),
+        setup_charge=safe_float(item.get("setupChg", "0")),
+        setup_charge_code=item.get("setupChgCode") or None,
+        repeat_charge=safe_float(item.get("repeatChg", "0")),
+        screen_charge=safe_float(item.get("screenChg", "0")),
+        proof_charge=safe_float(item.get("proofChg", "0")),
+        pms_charge=safe_float(item.get("pmsChg", "0")),
+        spec_sample_charge=safe_float(item.get("specSampleChg", "0")),
+        copy_change_charge=safe_float(item.get("copyChg", "0")),
+        additional_charges_text=item.get("additionalChargesText") or None,
+        colors=colors,
+        color_info_text=color_text or None,
+        imprint_info_text=item.get("imprintInfoText") or None,
+        packaging_text=item.get("packagingText") or None,
+        dimensions=dimensions,
+        ship_point=item.get("shipPoint") or None,
+        units_per_carton=units_per_carton,
+        weight_per_carton=weight_per_carton,
+        supplier=supplier,
+        image_urls=image_urls,
+        cat_year=item.get("catYear"),
+        cat_expires=item.get("catExpires")
+    )
+
+
+def safe_float(value: str) -> float:
+    """Safely convert string to float, returning 0.0 on failure."""
+    try:
+        return float(value) if value else 0.0
+    except ValueError:
+        return 0.0
+
+
+def extract_dimensions_from_text(text: str) -> Optional[str]:
+    """Extract dimensions from description text."""
+    if not text:
         return None
     
-    def search_products(self, query: str, filters: Optional[Dict] = None) -> List[Dict[str, Any]]:
-        """
-        Search for products in SAGE database.
-        
-        Args:
-            query: Search query
-            filters: Optional filters (category, supplier, price range, etc.)
-            
-        Returns:
-            List of matching products
-        
-        TODO: Implement when SAGE API access is available.
-        """
-        logger.warning(
-            f"SAGE API not implemented. Would search for: {query}. "
-            "Awaiting SAGE developer API credentials."
-        )
-        return []
+    patterns = [
+        r'(\d+[\d\s/\.]*"\s*[HWLD]?\s*[x×]\s*[\d\s/\.]+"\s*[HWLD]?(?:\s*[x×]\s*[\d\s/\.]+"\s*[HWLD]?)?)',
+        r'([\d.]+"\s*[HWLD]\s*[x×]\s*[\d.]+"\s*(?:Diameter|[HWLD]))',
+        r'([\d.]+"\s*Diameter)',
+    ]
     
-    def get_vendor_info(self, vendor_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get vendor/supplier information from SAGE.
-        
-        Args:
-            vendor_id: Vendor identifier
-            
-        Returns:
-            Vendor information dictionary, or None if not available
-        
-        TODO: Implement when SAGE API access is available.
-        """
-        logger.warning(
-            f"SAGE API not implemented. Would fetch vendor: {vendor_id}. "
-            "Awaiting SAGE developer API credentials."
-        )
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
         return None
 
 
@@ -172,166 +584,177 @@ class SAGEHandler:
     Handler for SAGE presentation links.
     
     This handler:
-    1. Scrapes the presentation using presentation_parser.py
-    2. Optionally enriches product data via SAGE API (when available)
-    3. Returns normalized product data ready for downstream processing
+    1. Extracts presId from viewpresentation.com URL
+    2. Calls SAGE Presentation API to get full data
+    3. Returns normalized product data ready for Zoho integration
     """
     
     def __init__(
         self,
         presentation_url: str,
-        sage_api_key: Optional[str] = None,
-        sage_api_secret: Optional[str] = None
+        acct_id: int = SAGE_ACCT_ID,
+        login_id: str = SAGE_LOGIN_ID,
+        auth_key: str = SAGE_AUTH_KEY
     ):
         """
         Initialize the SAGE handler.
         
         Args:
             presentation_url: URL of the SAGE presentation (viewpresentation.com)
-            sage_api_key: Optional SAGE API key for enrichment
-            sage_api_secret: Optional SAGE API secret
+            acct_id: SAGE account ID (default from config)
+            login_id: SAGE login ID (default from config)
+            auth_key: SAGE auth key (default from config)
         """
         self.presentation_url = presentation_url
-        self.sage_api = SAGEAPIClient(sage_api_key, sage_api_secret)
+        self.api_client = SAGEAPIClient(acct_id, login_id, auth_key)
     
-    def process(self) -> SAGEResult:
+    def process(self, use_scraper_fallback: bool = True) -> SAGEResult:
         """
         Process the SAGE presentation.
         
+        Args:
+            use_scraper_fallback: If True, fall back to web scraping if API fails
+        
         Returns:
-            SAGEResult with extracted and optionally enriched product data
+            SAGEResult with extracted product data
         """
         logger.info("=" * 60)
         logger.info("SAGE PRESENTATION HANDLER")
         logger.info("=" * 60)
         logger.info(f"URL: {self.presentation_url}")
         
+        # Check if API URL is configured
+        if not self.api_client.api_url:
+            logger.warning("SAGE API URL not configured - using web scraper")
+            if use_scraper_fallback:
+                return self._process_with_scraper()
+            else:
+                return SAGEResult(
+                    success=False,
+                    presentation_url=self.presentation_url,
+                    error="SAGE API URL not configured. Set SAGE_API_URL environment variable."
+                )
+        
         try:
-            # Step 1: Scrape the presentation
-            logger.info("Step 1: Scraping presentation...")
+            # Step 1: Extract presId from URL
+            logger.info("Step 1: Extracting presentation ID from URL...")
+            pres_id = extract_pres_id_from_url(self.presentation_url)
+            logger.info(f"  Presentation ID: {pres_id}")
+            
+            # Step 2: Call SAGE API
+            logger.info("Step 2: Calling SAGE Presentation API...")
+            raw_data = self.api_client.get_presentation(pres_id)
+            logger.info(f"  Items in presentation: {raw_data.get('itemCnt', 0)}")
+            
+            # Step 3: Parse response
+            logger.info("Step 3: Parsing presentation data...")
+            result = parse_presentation_response(raw_data, self.presentation_url)
+            
+            logger.info(f"  Title: {result.presentation_title}")
+            logger.info(f"  Client: {result.client.name} @ {result.client.company}")
+            logger.info(f"  Products extracted: {len(result.products)}")
+            
+            logger.info("=" * 60)
+            logger.info("SAGE API PROCESSING COMPLETE")
+            logger.info("=" * 60)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"SAGE API processing failed: {e}")
+            
+            if use_scraper_fallback:
+                logger.info("Falling back to web scraper...")
+                return self._process_with_scraper()
+            
+            return SAGEResult(
+                success=False,
+                presentation_url=self.presentation_url,
+                error=str(e)
+            )
+        finally:
+            self.api_client.close()
+    
+    def _process_with_scraper(self) -> SAGEResult:
+        """
+        Process using web scraper as fallback.
+        
+        Returns:
+            SAGEResult from scraped data
+        """
+        try:
+            from presentation_parser import scrape as scrape_presentation
+            
+            logger.info("Using web scraper for SAGE presentation...")
             presentation = scrape_presentation(self.presentation_url)
             
             logger.info(f"  Title: {presentation.title}")
             logger.info(f"  Client: {presentation.client_name} @ {presentation.client_company}")
             logger.info(f"  Products found: {len(presentation.products)}")
             
-            # Step 2: Normalize products
-            logger.info("Step 2: Normalizing product data...")
-            products = self._normalize_products(presentation)
+            # Convert scraped data to SAGEResult format
+            products = []
+            for p in presentation.products:
+                price_breaks = [
+                    SAGEPriceBreak(
+                        quantity=pb.quantity,
+                        catalog_price=pb.price,
+                        sell_price=pb.price,
+                        net_cost=0.0  # Not available from scraping
+                    )
+                    for pb in p.price_breaks
+                ]
+                
+                products.append(SAGEProduct(
+                    pres_item_id=0,
+                    item_num=p.item_number,
+                    name=p.title,
+                    description=p.description,
+                    colors=[c for c in p.colors] if p.colors else [],
+                    price_breaks=price_breaks,
+                    price_includes=p.price_includes,
+                    additional_charges_text=p.additional_charges,
+                    imprint_info_text=p.decoration_info,
+                    dimensions=p.dimensions,
+                    image_urls=p.image_urls
+                ))
             
-            # Step 3: Attempt API enrichment (if available)
-            api_enriched = False
-            if self.sage_api.is_available():
-                logger.info("Step 3: Enriching via SAGE API...")
-                products = self._enrich_products(products)
-                api_enriched = True
-            else:
-                logger.info("Step 3: SAGE API not available - skipping enrichment")
-                logger.info("=" * 60)
-                logger.info("SAGE API INTEGRATION PLACEHOLDER")
-                logger.info("=" * 60)
-                logger.info("When SAGE developer API access is obtained:")
-                logger.info("  1. Set SAGE_API_KEY and SAGE_API_SECRET env vars")
-                logger.info("  2. Implement SAGEAPIClient methods")
-                logger.info("  3. Product data will be automatically enriched with:")
-                logger.info("     - Complete pricing tiers")
-                logger.info("     - All decoration options")
-                logger.info("     - Vendor contact details")
-                logger.info("     - Inventory status")
-                logger.info("=" * 60)
-            
-            # Build result
             result = SAGEResult(
                 success=True,
                 presentation_url=self.presentation_url,
                 presentation_title=presentation.title,
-                client_name=presentation.client_name,
-                client_company=presentation.client_company,
-                presenter_name=presentation.presenter_name,
-                presenter_company=presentation.presenter_company,
+                client=SAGEClient(
+                    name=presentation.client_name,
+                    company=presentation.client_company
+                ),
+                presenter=SAGEPresenter(
+                    name=presentation.presenter_name or "Koell Collins",
+                    company=presentation.presenter_company or "STBL Strategies",
+                    phone=presentation.presenter_phone,
+                    location=presentation.presenter_location
+                ),
                 products=products,
-                api_enriched=api_enriched,
                 metadata={
+                    "source": "web_scraper",
                     "processed_at": datetime.now().isoformat(),
-                    "scraper_version": "presentation_parser.py",
-                    "api_available": self.sage_api.is_available()
+                    "item_count": len(products),
+                    "note": "Data from web scraping - some fields unavailable (net_cost, internalItemNum, clientId)"
                 }
             )
             
-            logger.info(f"Processing complete: {len(products)} products extracted")
+            logger.info("=" * 60)
+            logger.info("SAGE SCRAPER PROCESSING COMPLETE")
+            logger.info("=" * 60)
+            
             return result
             
         except Exception as e:
-            logger.error(f"SAGE processing failed: {e}", exc_info=True)
+            logger.error(f"SAGE scraper failed: {e}", exc_info=True)
             return SAGEResult(
                 success=False,
                 presentation_url=self.presentation_url,
-                presentation_title=None,
-                client_name=None,
-                client_company=None,
-                presenter_name=None,
-                presenter_company=None,
-                error=str(e)
+                error=f"Both API and scraper failed: {str(e)}"
             )
-    
-    def _normalize_products(self, presentation: Presentation) -> List[SAGEProduct]:
-        """
-        Convert presentation products to normalized SAGEProduct format.
-        
-        Args:
-            presentation: Scraped presentation data
-            
-        Returns:
-            List of normalized SAGEProduct objects
-        """
-        normalized = []
-        
-        for product in presentation.products:
-            # Convert price breaks to dict format
-            price_breaks = []
-            for pb in product.price_breaks:
-                price_breaks.append({
-                    "quantity": pb.quantity,
-                    "price": pb.price
-                })
-            
-            normalized.append(SAGEProduct(
-                sku=product.item_number or "",
-                name=product.title,
-                description=product.description,
-                colors=product.colors,
-                price_breaks=price_breaks,
-                decoration_info=product.decoration_info,
-                dimensions=product.dimensions,
-                image_urls=product.image_urls
-            ))
-        
-        return normalized
-    
-    def _enrich_products(self, products: List[SAGEProduct]) -> List[SAGEProduct]:
-        """
-        Enrich products with data from SAGE API.
-        
-        Args:
-            products: List of products to enrich
-            
-        Returns:
-            List of enriched products
-        """
-        enriched = []
-        
-        for product in products:
-            if product.sku:
-                # Try to get full details from API
-                details = self.sage_api.get_product_details(product.sku)
-                if details:
-                    product.full_details = details
-                    # Merge any additional data from API
-                    # (implementation depends on actual API response format)
-            
-            enriched.append(product)
-        
-        return enriched
     
     def to_dict(self, result: SAGEResult) -> Dict[str, Any]:
         """
@@ -341,24 +764,145 @@ class SAGEHandler:
             result: SAGEResult to convert
             
         Returns:
-            Dictionary representation
+            Dictionary representation matching ESP output format
         """
+        # Convert products to match ESP output format
+        products_list = []
+        for p in result.products:
+            # Build vendor object matching ESP format
+            vendor = None
+            if p.supplier:
+                vendor = {
+                    "name": p.supplier.name,
+                    "sage_id": p.supplier.sage_id,
+                    "website": p.supplier.website,
+                    "line_name": p.supplier.line_name,
+                    "email": p.supplier.email,
+                    "phone": p.supplier.phone,
+                    "city": p.supplier.city,
+                    "state": p.supplier.state,
+                    "zip": p.supplier.zip_code,
+                    "my_customer_number": p.supplier.my_customer_number,
+                    "my_cs_rep": p.supplier.my_cs_rep,
+                    "my_cs_rep_email": p.supplier.my_cs_rep_email
+                }
+            
+            # Build pricing breaks
+            pricing_breaks = [
+                {
+                    "quantity": pb.quantity,
+                    "catalog_price": pb.catalog_price,
+                    "sell_price": pb.sell_price,
+                    "net_cost": pb.net_cost
+                }
+                for pb in p.price_breaks
+            ]
+            
+            # Build fees array
+            fees = []
+            if p.setup_charge > 0:
+                fees.append({
+                    "fee_type": "setup",
+                    "name": "Setup Charge",
+                    "price": p.setup_charge,
+                    "price_code": p.setup_charge_code
+                })
+            if p.repeat_charge > 0:
+                fees.append({
+                    "fee_type": "reorder",
+                    "name": "Repeat/Reorder Charge",
+                    "price": p.repeat_charge
+                })
+            if p.proof_charge > 0:
+                fees.append({
+                    "fee_type": "proof",
+                    "name": "Proof Charge",
+                    "price": p.proof_charge
+                })
+            if p.pms_charge > 0:
+                fees.append({
+                    "fee_type": "pms_match",
+                    "name": "PMS Match Charge",
+                    "price": p.pms_charge
+                })
+            if p.spec_sample_charge > 0:
+                fees.append({
+                    "fee_type": "spec_sample",
+                    "name": "Spec Sample Charge",
+                    "price": p.spec_sample_charge
+                })
+            if p.copy_change_charge > 0:
+                fees.append({
+                    "fee_type": "copy_change",
+                    "name": "Copy Change Charge",
+                    "price": p.copy_change_charge
+                })
+            
+            products_list.append({
+                "identifiers": {
+                    "pres_item_id": p.pres_item_id,
+                    "prod_id": p.prod_id,
+                    "internal_item_num": p.internal_item_num,  # MPN for Zoho!
+                    "spc": p.spc,
+                    "item_num": p.item_num
+                },
+                "item": {
+                    "vendor_sku": p.internal_item_num,  # Use internal_item_num as vendor SKU
+                    "mpn": p.internal_item_num,  # MPN for Purchase Orders
+                    "name": p.name,
+                    "description": p.description,
+                    "category": p.category,
+                    "colors": p.colors,
+                    "dimensions": p.dimensions
+                },
+                "vendor": vendor,
+                "pricing": {
+                    "price_code": p.price_code,
+                    "price_includes": p.price_includes,
+                    "breaks": pricing_breaks
+                },
+                "fees": fees,
+                "decoration": {
+                    "imprint_info": p.imprint_info_text
+                },
+                "shipping": {
+                    "ship_point": p.ship_point,
+                    "units_per_carton": p.units_per_carton,
+                    "weight_per_carton": p.weight_per_carton,
+                    "packaging": p.packaging_text
+                },
+                "images": p.image_urls,
+                "additional_charges_text": p.additional_charges_text
+            })
+        
         return {
             "success": result.success,
+            "source_platform": "sage",
             "presentation_url": result.presentation_url,
+            "pres_id": result.pres_id,
+            "metadata": {
+                "generated_at": datetime.now().isoformat(),
             "presentation_title": result.presentation_title,
+                "presentation_date": result.presentation_date,
+                "total_items": len(result.products),
+                **result.metadata
+            },
             "client": {
-                "name": result.client_name,
-                "company": result.client_company
+                "id": result.client.client_id if result.client else None,
+                "name": result.client.name if result.client else None,
+                "company": result.client.company if result.client else None,
+                "email": result.client.email if result.client else None,
+                "phone": result.client.phone if result.client else None,
+                "tax_rate": result.client.tax_rate if result.client else None
             },
             "presenter": {
-                "name": result.presenter_name,
-                "company": result.presenter_company
+                "name": result.presenter.name if result.presenter else "Koell Collins",
+                "company": result.presenter.company if result.presenter else "STBL Strategies",
+                "phone": result.presenter.phone if result.presenter else None,
+                "website": result.presenter.website if result.presenter else None
             },
-            "products": [asdict(p) for p in result.products],
-            "api_enriched": result.api_enriched,
-            "error": result.error,
-            "metadata": result.metadata
+            "products": products_list,
+            "error": result.error
         }
 
 
@@ -369,9 +913,7 @@ class SAGEHandler:
 def main():
     """CLI entry point for testing the SAGE handler."""
     import argparse
-    import json
     import sys
-    import os
     
     parser = argparse.ArgumentParser(
         description="Process SAGE presentation and extract product data"
@@ -404,17 +946,8 @@ def main():
     if "viewpresentation.com" not in args.url:
         print("Warning: URL does not appear to be from viewpresentation.com", file=sys.stderr)
     
-    # Get SAGE API credentials from environment (if available)
-    sage_api_key = os.getenv("SAGE_API_KEY")
-    sage_api_secret = os.getenv("SAGE_API_SECRET")
-    
     # Process
-    handler = SAGEHandler(
-        presentation_url=args.url,
-        sage_api_key=sage_api_key,
-        sage_api_secret=sage_api_secret
-    )
-    
+    handler = SAGEHandler(presentation_url=args.url)
     result = handler.process()
     output_dict = handler.to_dict(result)
     
@@ -433,4 +966,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
