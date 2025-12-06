@@ -9,7 +9,7 @@ orgo
 selenium
 seleniumbase
 mycdp
-sbvirtualdisplay
+# sbvirtualdisplay  # Disabled due to Python 3.13+ compatibility issues
 websocket-client
 websockets
 wsproto
