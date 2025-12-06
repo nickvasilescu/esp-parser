@@ -80,6 +80,7 @@ class SAGEProduct:
     # Identifiers
     pres_item_id: int
     prod_id: Optional[int] = None
+    encrypted_prod_id: Optional[str] = None  # For Full Product Detail API
     internal_item_num: Optional[str] = None  # This is the MPN for Zoho!
     spc: Optional[str] = None  # SAGE Product Code
     item_num: Optional[str] = None  # Display item number
@@ -254,10 +255,21 @@ class SAGEAPIClient:
             raise Exception("SAGE API returned empty response")
         
         result = response.json()
-        logger.debug(f"SAGE API Response OK: {result.get('ok', False)}")
         
-        if not result.get("ok", False):
-            raise Exception(f"SAGE API error: {result}")
+        # Check for success - different APIs have different response formats:
+        # - Presentation API (301): {"ok": true, "presentations": [...]}
+        # - Full Product Detail API (105): {"legalNote": "...", "product": {...}}
+        # - Error responses: {"ok": false, "errNum": "...", "errMsg": "..."}
+        
+        if result.get("ok") == False:
+            # Explicit error
+            raise Exception(f"SAGE API error: {result.get('errMsg', result)}")
+        
+        # Check if this is a valid response (either has 'ok' or has 'product' or 'legalNote')
+        if not (result.get("ok") or result.get("product") or result.get("presentations")):
+            raise Exception(f"SAGE API unexpected response: {result}")
+        
+        logger.debug(f"SAGE API Response OK: {result.get('ok', 'N/A (has product)')}")
         
         return result
     
@@ -516,6 +528,7 @@ def parse_item(item: Dict[str, Any]) -> SAGEProduct:
     return SAGEProduct(
         pres_item_id=item.get("presItemId", 0),
         prod_id=item.get("prodId"),
+        encrypted_prod_id=item.get("encryptedProdId"),  # For Full Product Detail API
         internal_item_num=item.get("internalItemNum"),  # This is the MPN!
         spc=item.get("spc"),
         item_num=item.get("itemNum"),
@@ -575,6 +588,130 @@ def extract_dimensions_from_text(text: str) -> Optional[str]:
         return None
 
 
+def enrich_products_with_net_costs(
+    products: List[SAGEProduct],
+    api_client: 'SAGEAPIClient',
+    use_full_product_detail: bool = True
+) -> List[SAGEProduct]:
+    """
+    Enrich products with authoritative net costs from Full Product Detail API.
+    
+    The Presentation API provides:
+    - sellPrcs: SELL PRICE (what customer sees) ← TRUSTED for sell price
+    - costs: Cost from presentation (may be adjusted by sales rep)
+    
+    The Full Product Detail API (serviceId 105) provides:
+    - net: Authoritative NET COST from SAGE database ← TRUSTED for net cost
+    
+    This function calls the Full Product Detail API for each product and
+    updates the net_cost values with the authoritative data.
+    
+    Args:
+        products: List of products parsed from presentation
+        api_client: SAGE API client
+        use_full_product_detail: If True, call Full Product Detail API for net costs
+        
+    Returns:
+        Enriched products with authoritative net costs
+    """
+    if not use_full_product_detail:
+        logger.info("Skipping Full Product Detail enrichment (using presentation costs)")
+        return products
+    
+    logger.info("=" * 60)
+    logger.info("ENRICHING PRODUCTS WITH FULL PRODUCT DETAIL API")
+    logger.info("=" * 60)
+    logger.info(f"Products to enrich: {len(products)}")
+    
+    # First, check if the service is enabled by testing one product
+    if products:
+        test_product = products[0]
+        # Prefer encrypted_prod_id for API calls, fall back to SPC
+        test_id = test_product.encrypted_prod_id or test_product.spc
+        if test_id:
+            try:
+                test_result = api_client.get_product_detail(test_id, include_supplier=False)
+            except Exception as e:
+                if "10010" in str(e) or "not currently enabled" in str(e):
+                    logger.warning("=" * 60)
+                    logger.warning("Full Product Detail API (serviceId 105) is NOT ENABLED")
+                    logger.warning("To enable: SAGEmember.com → SAGE Connect → Services → Enable 'Full Product Detail'")
+                    logger.warning("Using presentation costs as net_cost (may not be authoritative)")
+                    logger.warning("=" * 60)
+                    return products
+    
+    enriched_count = 0
+    for product in products:
+        # Get product ID - use encrypted_prod_id for API (required by Full Product Detail)
+        # Fall back to SPC if no encrypted_prod_id
+        encrypted_id = product.encrypted_prod_id
+        spc = product.spc
+        
+        if not encrypted_id and not spc:
+            logger.debug(f"No encrypted_prod_id or SPC for product: {product.name}")
+            continue
+        
+        try:
+            # Call Full Product Detail API
+            # Use encrypted_prod_id (e.g., "987510533") not prod_id (e.g., 7510533)
+            if encrypted_id:
+                detail = api_client.get_product_detail(encrypted_id, include_supplier=False)
+            else:
+                # Use SPC if no encrypted_prod_id
+                detail = api_client.get_product_detail(spc, include_supplier=False)
+            
+            if not detail:
+                logger.info(f"  ✗ No detail returned for {product.name}")
+                continue
+            
+            # Extract authoritative net costs from Full Product Detail
+            net_costs = detail.get("net", [])
+            qtys = detail.get("qty", [])
+            
+            logger.info(f"  Product: {product.name[:40]}...")
+            logger.info(f"    Presentation qtys: {[pb.quantity for pb in product.price_breaks]}")
+            logger.info(f"    Full Detail qtys: {qtys}")
+            logger.info(f"    Full Detail net: {net_costs}")
+            
+            if net_costs and qtys:
+                # Create a lookup of net costs by quantity
+                net_by_qty = {}
+                for i, qty_str in enumerate(qtys):
+                    if qty_str and qty_str != "0":
+                        try:
+                            qty = int(qty_str.replace(",", ""))
+                            net = float(net_costs[i]) if i < len(net_costs) and net_costs[i] else 0.0
+                            net_by_qty[qty] = net
+                        except (ValueError, IndexError):
+                            continue
+                
+                # Update product price breaks with authoritative net costs
+                for break_item in product.price_breaks:
+                    if break_item.quantity in net_by_qty:
+                        # Store the presentation cost as "presentation_cost" for audit
+                        # Update net_cost with authoritative SAGE database value
+                        old_cost = break_item.net_cost
+                        new_cost = net_by_qty[break_item.quantity]
+                        
+                        if old_cost != new_cost:
+                            logger.debug(
+                                f"  {product.name} qty {break_item.quantity}: "
+                                f"presentation_cost={old_cost} → net_cost={new_cost}"
+                            )
+                        break_item.net_cost = new_cost
+                
+                enriched_count += 1
+                logger.debug(f"  ✓ Enriched: {product.name}")
+            
+        except Exception as e:
+            logger.info(f"  ✗ Failed to enrich {product.name[:30]}: {e}")
+            # Keep the presentation costs if API call fails
+            continue
+    
+    logger.info(f"Enrichment complete: {enriched_count}/{len(products)} products updated")
+    return products
+
+
 # =============================================================================
 # SAGE Handler
 # =============================================================================
@@ -608,12 +745,17 @@ class SAGEHandler:
         self.presentation_url = presentation_url
         self.api_client = SAGEAPIClient(acct_id, login_id, auth_key)
     
-    def process(self, use_scraper_fallback: bool = True) -> SAGEResult:
+    def process(
+        self,
+        use_scraper_fallback: bool = True,
+        enrich_net_costs: bool = True
+    ) -> SAGEResult:
         """
         Process the SAGE presentation.
         
         Args:
             use_scraper_fallback: If True, fall back to web scraping if API fails
+            enrich_net_costs: If True, call Full Product Detail API for authoritative net costs
         
         Returns:
             SAGEResult with extracted product data
@@ -641,8 +783,10 @@ class SAGEHandler:
             pres_id = extract_pres_id_from_url(self.presentation_url)
             logger.info(f"  Presentation ID: {pres_id}")
             
-            # Step 2: Call SAGE API
+            # Step 2: Call SAGE Presentation API (gets SELL PRICES)
             logger.info("Step 2: Calling SAGE Presentation API...")
+            logger.info("  → sellPrcs = SELL PRICE (what customer sees)")
+            logger.info("  → costs = Presentation cost (may be adjusted)")
             raw_data = self.api_client.get_presentation(pres_id)
             logger.info(f"  Items in presentation: {raw_data.get('itemCnt', 0)}")
             
@@ -653,6 +797,27 @@ class SAGEHandler:
             logger.info(f"  Title: {result.presentation_title}")
             logger.info(f"  Client: {result.client.name} @ {result.client.company}")
             logger.info(f"  Products extracted: {len(result.products)}")
+            
+            # Step 4: Enrich with Full Product Detail API (gets authoritative NET COSTS)
+            # The presentation has costs, but Full Product Detail has the authoritative
+            # net costs from SAGE's database
+            if enrich_net_costs:
+                logger.info("Step 4: Enriching with Full Product Detail API...")
+                logger.info("  → net = NET COST (authoritative SAGE database cost)")
+                result.products = enrich_products_with_net_costs(
+                    result.products,
+                    self.api_client,
+                    use_full_product_detail=True
+                )
+            else:
+                logger.info("Step 4: Skipping Full Product Detail enrichment (using presentation costs)")
+            
+            # Update metadata to reflect pricing sources
+            result.metadata["pricing_sources"] = {
+                "sell_price": "From Presentation API (serviceId 301) - what customer sees",
+                "net_cost": "From Full Product Detail API (serviceId 105) - authoritative distributor cost",
+                "margin_calculation": "sell_price - net_cost = margin"
+            }
             
             logger.info("=" * 60)
             logger.info("SAGE API PROCESSING COMPLETE")
@@ -842,6 +1007,7 @@ class SAGEHandler:
                 "identifiers": {
                     "pres_item_id": p.pres_item_id,
                     "prod_id": p.prod_id,
+                    "encrypted_prod_id": p.encrypted_prod_id,
                     "internal_item_num": p.internal_item_num,  # MPN for Zoho!
                     "spc": p.spc,
                     "item_num": p.item_num

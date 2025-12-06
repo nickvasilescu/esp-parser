@@ -73,7 +73,7 @@ You MUST always return a JSON object with this structure:
       "pricing_breaks": [
         {
           "quantity": null,
-          "price": null
+          "sell_price": null
         }
       ],
       "additional_charges": [
@@ -195,9 +195,13 @@ For each product in the presentation, extract:
   Example: "One color fill"
 
 - `products[].pricing_breaks`
-  Array of quantity/price break objects. Each break has:
+  Array of quantity/sell_price break objects. Each break has:
   - `quantity`: The quantity tier (integer). Example: 12, 48, 108, 204, 300
-  - `price`: The per-unit price at that quantity (number). Example: 75.16, 69.00
+  - `sell_price`: The per-unit SELL PRICE at that quantity (number). Example: 75.16, 69.00
+  
+  IMPORTANT: These are the SELL PRICES shown to the customer in the presentation.
+  They are NOT the distributor's net cost. The sell price is what gets quoted to the client.
+  The net_cost comes from a different source (distributor report) and is merged later.
 
 - `products[].additional_charges`
   Array of additional charge objects. Each charge has:

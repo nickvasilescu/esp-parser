@@ -36,6 +36,7 @@ from config import (
     SAGE_API_SECRET,
     get_config_summary,
 )
+from output_normalizer import normalize_output, detect_source
 
 
 # Set up logging
@@ -126,6 +127,83 @@ def create_zoho_ready_output(
             "track_inventory": False
         }
     }
+
+
+def merge_presentation_and_product_data(
+    presentation_products: List[Dict[str, Any]],
+    distributor_products: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Merge presentation data (sell prices) with distributor report data (net costs).
+    
+    The presentation PDF shows what the CLIENT sees → SELL PRICE (trusted source)
+    The distributor report shows what the DISTRIBUTOR pays → NET COST (trusted source)
+    
+    Args:
+        presentation_products: Products from prompt_presentation.py (has sell prices)
+        distributor_products: Products from prompt.py (has net costs)
+        
+    Returns:
+        Merged products with both sell_price and net_cost
+    """
+    # Index presentation products by CPN for fast lookup
+    presentation_by_cpn = {}
+    for pres_prod in presentation_products:
+        cpn = pres_prod.get("cpn") or ""
+        if cpn:
+            presentation_by_cpn[cpn] = pres_prod
+    
+    merged_products = []
+    
+    for dist_prod in distributor_products:
+        # Skip error entries
+        if "error" in dist_prod:
+            merged_products.append(dist_prod)
+            continue
+        
+        # Try to find matching presentation product by CPN
+        cpn = dist_prod.get("cpn") or ""
+        pres_prod = presentation_by_cpn.get(cpn)
+        
+        if pres_prod:
+            # Merge sell prices from presentation into distributor product
+            pres_pricing_breaks = pres_prod.get("pricing_breaks", [])
+            dist_pricing = dist_prod.get("pricing", {})
+            dist_breaks = dist_pricing.get("breaks", [])
+            
+            # Create lookup of presentation sell prices by quantity
+            pres_prices_by_qty = {}
+            for pb in pres_pricing_breaks:
+                qty = pb.get("quantity")
+                # Support both "sell_price" (new schema) and "price" (legacy)
+                sell_price = pb.get("sell_price") or pb.get("price")
+                if qty is not None:
+                    pres_prices_by_qty[qty] = sell_price
+            
+            # Merge sell_price into distributor breaks
+            for break_item in dist_breaks:
+                qty = break_item.get("quantity")
+                if qty in pres_prices_by_qty:
+                    break_item["sell_price"] = pres_prices_by_qty[qty]
+                    # Ensure we have the field labeled correctly
+                    # net_cost should already be there from distributor report
+            
+            # Also copy presentation-level data that might be missing
+            if not dist_prod.get("presentation_sell_data"):
+                dist_prod["presentation_sell_data"] = {
+                    "price_range": pres_prod.get("price_range"),
+                    "price_includes": pres_prod.get("price_includes"),
+                    "pricing_breaks": pres_pricing_breaks,
+                    "additional_charges": pres_prod.get("additional_charges", [])
+                }
+            
+            logger.debug(f"Merged sell prices for CPN {cpn}")
+        else:
+            logger.debug(f"No presentation match for CPN {cpn}")
+        
+        merged_products.append(dist_prod)
+    
+    return merged_products
 
 
 # =============================================================================
@@ -225,7 +303,8 @@ def run_esp_pipeline(
     job_id: str,
     computer_id: Optional[str] = None,
     dry_run: bool = False,
-    skip_cua: bool = False
+    skip_cua: bool = False,
+    limit_products: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Execute the ESP pipeline.
@@ -243,6 +322,7 @@ def run_esp_pipeline(
         computer_id: Orgo computer ID
         dry_run: If True, skip CUA execution
         skip_cua: If True, use existing PDFs
+        limit_products: If set, only process this many products (useful for testing)
         
     Returns:
         Final output dictionary
@@ -366,6 +446,12 @@ def run_esp_pipeline(
             # Extract products list
             products_to_lookup = parsed_presentation.get("products", [])
             logger.info(f"Found {len(products_to_lookup)} products in presentation")
+            
+            # Apply product limit if specified (useful for testing)
+            if limit_products is not None and limit_products > 0:
+                original_count = len(products_to_lookup)
+                products_to_lookup = products_to_lookup[:limit_products]
+                logger.info(f"LIMITED to first {limit_products} product(s) (was {original_count})")
             
             # Extract presentation metadata
             pres_meta = parsed_presentation.get("presentation", {})
@@ -563,18 +649,49 @@ def run_esp_pipeline(
         logger.warning("No product PDFs to parse")
     
     # =========================================================================
-    # Step 5: Generate Output
+    # Step 5: Merge Presentation + Product Data
     # =========================================================================
     logger.info("=" * 60)
-    logger.info("STEP 5: GENERATE OUTPUT")
+    logger.info("STEP 5: MERGE PRESENTATION & PRODUCT DATA")
+    logger.info("=" * 60)
+    
+    # CRITICAL MERGE:
+    # - Presentation PDF (prompt_presentation.py) = SELL PRICE (what customer sees)
+    # - Distributor Report (prompt.py) = NET COST (what distributor pays)
+    # Both are needed for Zoho quotes and margin calculation
+    
+    if products_to_lookup and parsed_products:
+        logger.info(f"Merging {len(products_to_lookup)} presentation products with {len(parsed_products)} distributor products")
+        merged_products = merge_presentation_and_product_data(
+            presentation_products=products_to_lookup,
+            distributor_products=parsed_products
+        )
+        logger.info(f"Merge complete: {len(merged_products)} products")
+    else:
+        merged_products = parsed_products
+        if not products_to_lookup:
+            logger.warning("No presentation products to merge (sell prices may be missing)")
+    
+    # =========================================================================
+    # Step 6: Generate Output
+    # =========================================================================
+    logger.info("=" * 60)
+    logger.info("STEP 6: GENERATE OUTPUT")
     logger.info("=" * 60)
     
     final_output = create_zoho_ready_output(
         source_type="esp",
         presentation_data=presentation_data,
-        products=parsed_products,
+        products=merged_products,
         errors=errors
     )
+    
+    # Add pricing source notes for downstream consumers
+    final_output["pricing_sources"] = {
+        "sell_price": "From presentation PDF (what client sees)",
+        "net_cost": "From distributor report PDF (what distributor pays)",
+        "margin_calculation": "sell_price - net_cost = margin"
+    }
     
     return final_output
 
@@ -594,7 +711,8 @@ class Orchestrator:
         computer_id: Optional[str] = None,
         job_id: Optional[str] = None,
         dry_run: bool = False,
-        skip_cua: bool = False
+        skip_cua: bool = False,
+        limit_products: Optional[int] = None
     ):
         """
         Initialize the orchestrator.
@@ -605,11 +723,13 @@ class Orchestrator:
             job_id: Optional job ID (auto-generated if not provided)
             dry_run: If True, skip actual processing
             skip_cua: If True, use existing PDFs
+            limit_products: If set, only process this many products (useful for testing)
         """
         self.url = url
         self.computer_id = computer_id
         self.dry_run = dry_run
         self.skip_cua = skip_cua
+        self.limit_products = limit_products
         
         # Generate or use provided job ID
         self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -637,6 +757,7 @@ class Orchestrator:
         logger.info(f"Detected Type: {self.presentation_type.value}")
         logger.info(f"Dry Run: {self.dry_run}")
         logger.info(f"Skip CUA: {self.skip_cua}")
+        logger.info(f"Limit Products: {self.limit_products or 'ALL'}")
         
         # Validate config if needed
         if not self.dry_run and self.presentation_type == PresentationType.ESP:
@@ -654,7 +775,8 @@ class Orchestrator:
                 job_id=self.job_id,
                 computer_id=self.computer_id,
                 dry_run=self.dry_run,
-                skip_cua=self.skip_cua
+                skip_cua=self.skip_cua,
+                limit_products=self.limit_products
             )
         else:
             logger.error(f"Unknown presentation type for URL: {self.url}")
@@ -663,27 +785,51 @@ class Orchestrator:
                 "error": f"Unknown presentation URL type. Supported domains: {SAGE_PRESENTATION_DOMAIN}, portal.mypromooffice.com"
             }
         
-        # Save output to file
+        # Normalize output to unified schema
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         pipeline_name = self.presentation_type.value
-        output_filename = f"{pipeline_name}_output_{timestamp}.json"
+        
+        logger.info("=" * 60)
+        logger.info("NORMALIZING OUTPUT TO UNIFIED SCHEMA")
+        logger.info("=" * 60)
+        
+        try:
+            # Normalize to unified format for downstream Zoho/Calculator workflows
+            normalized_result = normalize_output(result, source=pipeline_name)
+            logger.info(f"Normalization successful - unified schema applied")
+        except Exception as e:
+            logger.warning(f"Normalization failed: {e}. Saving raw output.")
+            normalized_result = result
+        
+        # Save normalized (unified) output
+        output_filename = f"unified_output_{pipeline_name}_{timestamp}.json"
         output_path = Path(OUTPUT_DIR) / output_filename
         
         with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(normalized_result, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Unified output saved to: {output_path}")
+        
+        # Also save raw output for debugging/reference
+        raw_output_filename = f"raw_{pipeline_name}_output_{timestamp}.json"
+        raw_output_path = Path(OUTPUT_DIR) / raw_output_filename
+        
+        with open(raw_output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"Output saved to: {output_path}")
+        logger.info(f"Raw output saved to: {raw_output_path}")
         
         # Summary
         logger.info("=" * 60)
         logger.info("ORCHESTRATION COMPLETE")
         logger.info("=" * 60)
         logger.info(f"Pipeline: {pipeline_name}")
-        logger.info(f"Products: {len(result.get('products', []))}")
-        logger.info(f"Errors: {len(result.get('errors', []))}")
-        logger.info(f"Ready for Zoho: {result.get('ready_for_zoho', False)}")
+        logger.info(f"Products: {len(normalized_result.get('products', []))}")
+        logger.info(f"Errors: {len(normalized_result.get('errors', []))}")
+        logger.info(f"Source: {normalized_result.get('metadata', {}).get('source', 'unknown')}")
+        logger.info(f"Unified schema: YES - ready for Zoho/Calculator")
         
-        return result
+        return normalized_result  # Return unified format for downstream workflows
 
 
 # =============================================================================
@@ -708,6 +854,9 @@ Examples:
   
   # Use existing PDFs (skip CUA downloads)
   %(prog)s <url> --skip-cua
+  
+  # Test end-to-end with only the first product
+  %(prog)s <url> --limit-products 1
 
 Supported URL Patterns:
   SAGE:  viewpresentation.com/*
@@ -759,6 +908,13 @@ Environment Variables:
     )
     
     parser.add_argument(
+        "--limit-products",
+        type=int,
+        default=None,
+        help="Limit to first N products (useful for testing end-to-end with --limit-products 1)"
+    )
+    
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable verbose logging"
@@ -782,7 +938,8 @@ Environment Variables:
         computer_id=args.computer_id,
         job_id=args.job_id,
         dry_run=args.dry_run,
-        skip_cua=args.skip_cua
+        skip_cua=args.skip_cua,
+        limit_products=args.limit_products
     )
     
     try:
