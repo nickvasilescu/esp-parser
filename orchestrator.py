@@ -38,6 +38,15 @@ from config import (
 )
 from output_normalizer import normalize_output, detect_source
 
+# Zoho integration (optional - only import if needed)
+ZOHO_AVAILABLE = False
+try:
+    from zoho_item_agent import ZohoItemMasterAgent, AgentResult
+    from zoho_config import validate_zoho_config
+    ZOHO_AVAILABLE = True
+except ImportError:
+    pass
+
 
 # Set up logging
 logging.basicConfig(
@@ -712,7 +721,9 @@ class Orchestrator:
         job_id: Optional[str] = None,
         dry_run: bool = False,
         skip_cua: bool = False,
-        limit_products: Optional[int] = None
+        limit_products: Optional[int] = None,
+        zoho_upload: bool = False,
+        zoho_dry_run: bool = False
     ):
         """
         Initialize the orchestrator.
@@ -724,12 +735,16 @@ class Orchestrator:
             dry_run: If True, skip actual processing
             skip_cua: If True, use existing PDFs
             limit_products: If set, only process this many products (useful for testing)
+            zoho_upload: If True, upload items to Zoho Item Master after normalization
+            zoho_dry_run: If True, validate Zoho upload but don't actually upload
         """
         self.url = url
         self.computer_id = computer_id
         self.dry_run = dry_run
         self.skip_cua = skip_cua
         self.limit_products = limit_products
+        self.zoho_upload = zoho_upload
+        self.zoho_dry_run = zoho_dry_run
         
         # Generate or use provided job ID
         self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -819,6 +834,52 @@ class Orchestrator:
         
         logger.info(f"Raw output saved to: {raw_output_path}")
         
+        # =========================================================================
+        # Optional: Zoho Item Master Upload
+        # =========================================================================
+        zoho_result = None
+        if self.zoho_upload:
+            logger.info("=" * 60)
+            logger.info("ZOHO ITEM MASTER UPLOAD")
+            logger.info("=" * 60)
+            
+            if not ZOHO_AVAILABLE:
+                logger.error("Zoho integration not available. Install zoho_item_agent module.")
+            else:
+                try:
+                    # Validate Zoho configuration
+                    validate_zoho_config()
+                    
+                    # Create and run agent
+                    zoho_agent = ZohoItemMasterAgent()
+                    zoho_result = zoho_agent.process_unified_output(
+                        normalized_result,
+                        dry_run=self.zoho_dry_run
+                    )
+                    
+                    # Add Zoho result to normalized output
+                    normalized_result["zoho_upload_result"] = {
+                        "success": zoho_result.success,
+                        "total_products": zoho_result.total_products,
+                        "successful_uploads": zoho_result.successful_uploads,
+                        "failed_uploads": zoho_result.failed_uploads,
+                        "duration_seconds": zoho_result.duration_seconds,
+                        "errors": zoho_result.errors
+                    }
+                    
+                    # Save updated output with Zoho results
+                    with open(output_path, "w", encoding="utf-8") as f:
+                        json.dump(normalized_result, f, indent=2, ensure_ascii=False)
+                    
+                    logger.info(f"Zoho upload complete: {zoho_result.successful_uploads}/{zoho_result.total_products} items")
+                    
+                except Exception as e:
+                    logger.error(f"Zoho upload failed: {e}")
+                    normalized_result["zoho_upload_result"] = {
+                        "success": False,
+                        "error": str(e)
+                    }
+        
         # Summary
         logger.info("=" * 60)
         logger.info("ORCHESTRATION COMPLETE")
@@ -828,6 +889,8 @@ class Orchestrator:
         logger.info(f"Errors: {len(normalized_result.get('errors', []))}")
         logger.info(f"Source: {normalized_result.get('metadata', {}).get('source', 'unknown')}")
         logger.info(f"Unified schema: YES - ready for Zoho/Calculator")
+        if zoho_result:
+            logger.info(f"Zoho Upload: {zoho_result.successful_uploads}/{zoho_result.total_products} items uploaded")
         
         return normalized_result  # Return unified format for downstream workflows
 
@@ -857,6 +920,15 @@ Examples:
   
   # Test end-to-end with only the first product
   %(prog)s <url> --limit-products 1
+  
+  # Process and upload to Zoho Item Master
+  %(prog)s <url> --zoho-upload
+  
+  # Validate Zoho upload without actually uploading
+  %(prog)s <url> --zoho-dry-run
+  
+  # Full workflow: skip CUA, upload to Zoho
+  %(prog)s <url> --skip-cua --zoho-upload
 
 Supported URL Patterns:
   SAGE:  viewpresentation.com/*
@@ -874,6 +946,12 @@ Environment Variables:
   AWS_S3_BUCKET         S3 bucket name for file storage (required for ESP pipeline)
   SAGE_API_KEY          SAGE API key (optional, for future enrichment)
   SAGE_API_SECRET       SAGE API secret (optional)
+  
+  Zoho Integration (required for --zoho-upload):
+  ZOHO_ORG_ID           Zoho organization ID
+  ZOHO_CLIENT_ID        Zoho OAuth client ID
+  ZOHO_CLIENT_SECRET    Zoho OAuth client secret
+  ZOHO_REFRESH_TOKEN    Zoho OAuth refresh token
         """
     )
     
@@ -926,11 +1004,26 @@ Environment Variables:
         help="Print final output as JSON to stdout"
     )
     
+    parser.add_argument(
+        "--zoho-upload",
+        action="store_true",
+        help="Upload items to Zoho Item Master after normalization"
+    )
+    
+    parser.add_argument(
+        "--zoho-dry-run",
+        action="store_true",
+        help="Validate Zoho upload without actually uploading (implies --zoho-upload)"
+    )
+    
     args = parser.parse_args()
     
     # Set logging level
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Handle Zoho flags
+    zoho_upload = args.zoho_upload or args.zoho_dry_run
     
     # Create and run orchestrator
     orchestrator = Orchestrator(
@@ -939,7 +1032,9 @@ Environment Variables:
         job_id=args.job_id,
         dry_run=args.dry_run,
         skip_cua=args.skip_cua,
-        limit_products=args.limit_products
+        limit_products=args.limit_products,
+        zoho_upload=zoho_upload,
+        zoho_dry_run=args.zoho_dry_run
     )
     
     try:
