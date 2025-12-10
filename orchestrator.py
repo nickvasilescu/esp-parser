@@ -155,14 +155,35 @@ def merge_presentation_and_product_data(
     Returns:
         Merged products with both sell_price and net_cost
     """
+    # Helper to normalize CPN (strip "CPN-" prefix if present)
+    def normalize_cpn(cpn: str) -> str:
+        if cpn and cpn.upper().startswith("CPN-"):
+            return cpn[4:]  # Remove "CPN-" prefix
+        return cpn
+    
     # Index presentation products by CPN for fast lookup
+    # Index both with and without "CPN-" prefix for flexible matching
     presentation_by_cpn = {}
     for pres_prod in presentation_products:
         cpn = pres_prod.get("cpn") or ""
         if cpn:
+            # Store with original key
             presentation_by_cpn[cpn] = pres_prod
+            # Also store with normalized key (without CPN- prefix)
+            normalized = normalize_cpn(cpn)
+            if normalized != cpn:
+                presentation_by_cpn[normalized] = pres_prod
+    
+    logger.info(f"Merge: {len(presentation_by_cpn)} presentation products indexed by CPN")
+    logger.info(f"Merge: {len(distributor_products)} distributor products to process")
     
     merged_products = []
+    merge_stats = {
+        "matched": 0,
+        "unmatched": 0,
+        "prices_merged": 0,
+        "prices_missing": 0
+    }
     
     for dist_prod in distributor_products:
         # Skip error entries
@@ -171,10 +192,13 @@ def merge_presentation_and_product_data(
             continue
         
         # Try to find matching presentation product by CPN
-        cpn = dist_prod.get("cpn") or ""
-        pres_prod = presentation_by_cpn.get(cpn)
+        # CPN can be at root level or nested in item object
+        cpn = dist_prod.get("item", {}).get("cpn") or dist_prod.get("cpn") or ""
+        # Try exact match first, then normalized (without CPN- prefix)
+        pres_prod = presentation_by_cpn.get(cpn) or presentation_by_cpn.get(normalize_cpn(cpn))
         
         if pres_prod:
+            merge_stats["matched"] += 1
             # Merge sell prices from presentation into distributor product
             pres_pricing_breaks = pres_prod.get("pricing_breaks", [])
             dist_pricing = dist_prod.get("pricing", {})
@@ -189,13 +213,26 @@ def merge_presentation_and_product_data(
                 if qty is not None:
                     pres_prices_by_qty[qty] = sell_price
             
+            logger.debug(f"CPN {cpn}: Presentation has {len(pres_prices_by_qty)} price breaks: {list(pres_prices_by_qty.keys())}")
+            
             # Merge sell_price into distributor breaks
+            prices_merged_for_product = 0
             for break_item in dist_breaks:
-                qty = break_item.get("quantity")
+                # Handle both 'quantity' (normalized) and 'min_qty' (raw ESP format)
+                qty = break_item.get("quantity") or break_item.get("min_qty")
                 if qty in pres_prices_by_qty:
                     break_item["sell_price"] = pres_prices_by_qty[qty]
-                    # Ensure we have the field labeled correctly
-                    # net_cost should already be there from distributor report
+                    prices_merged_for_product += 1
+                    logger.debug(f"  Merged sell_price={pres_prices_by_qty[qty]} for qty={qty}")
+                else:
+                    logger.debug(f"  No price match for qty={qty} (available: {list(pres_prices_by_qty.keys())})")
+            
+            if prices_merged_for_product > 0:
+                merge_stats["prices_merged"] += 1
+                logger.info(f"Merge SUCCESS: CPN {cpn} - {prices_merged_for_product} sell prices merged")
+            else:
+                merge_stats["prices_missing"] += 1
+                logger.warning(f"Merge PARTIAL: CPN {cpn} matched but NO sell prices merged (qty mismatch?)")
             
             # Also copy presentation-level data that might be missing
             if not dist_prod.get("presentation_sell_data"):
@@ -205,12 +242,23 @@ def merge_presentation_and_product_data(
                     "pricing_breaks": pres_pricing_breaks,
                     "additional_charges": pres_prod.get("additional_charges", [])
                 }
-            
-            logger.debug(f"Merged sell prices for CPN {cpn}")
         else:
-            logger.debug(f"No presentation match for CPN {cpn}")
+            merge_stats["unmatched"] += 1
+            logger.warning(f"Merge FAILED: CPN '{cpn}' not found in presentation data (available: {list(presentation_by_cpn.keys())})")
         
         merged_products.append(dist_prod)
+    
+    # Log merge summary
+    logger.info("=" * 40)
+    logger.info("MERGE SUMMARY")
+    logger.info(f"  Products matched by CPN: {merge_stats['matched']}")
+    logger.info(f"  Products unmatched: {merge_stats['unmatched']}")
+    logger.info(f"  Products with sell prices merged: {merge_stats['prices_merged']}")
+    logger.info(f"  Products with missing sell prices: {merge_stats['prices_missing']}")
+    logger.info("=" * 40)
+    
+    if merge_stats["prices_missing"] > 0 or merge_stats["unmatched"] > 0:
+        logger.warning("Some products may be missing sell prices - check logs above for details")
     
     return merged_products
 
@@ -254,10 +302,9 @@ def run_sage_pipeline(
         }
     
     # Initialize and run SAGE handler
+    # SAGEHandler uses SAGE Connect API with defaults from environment/hardcoded values
     handler = SAGEHandler(
-        presentation_url=url,
-        sage_api_key=SAGE_API_KEY,
-        sage_api_secret=SAGE_API_SECRET
+        presentation_url=url
     )
     
     result = handler.process()
@@ -276,12 +323,12 @@ def run_sage_pipeline(
         "url": url,
         "title": result.presentation_title,
         "client": {
-            "name": result.client_name,
-            "company": result.client_company
+            "name": result.client.name if result.client else None,
+            "company": result.client.company if result.client else None
         },
         "presenter": {
-            "name": result.presenter_name,
-            "company": result.presenter_company
+            "name": result.presenter.name if result.presenter else None,
+            "company": result.presenter.company if result.presenter else None
         },
         "total_items": len(products)
     }
@@ -294,7 +341,7 @@ def run_sage_pipeline(
     )
     
     # Note about API enrichment
-    if not result.api_enriched:
+    if not result.metadata.get("api_enriched", False):
         final_output["sage_api_note"] = (
             "Product data was scraped from presentation only. "
             "Full enrichment via SAGE API pending developer access."
@@ -477,6 +524,12 @@ def run_esp_pipeline(
                 },
                 "total_items": len(products_to_lookup)
             }
+            
+            # Save presentation extraction output for debugging
+            pres_output_path = output_dir / f"presentation_extract_{job_id}.json"
+            with open(pres_output_path, 'w') as f:
+                json.dump(parsed_presentation, f, indent=2)
+            logger.info(f"Saved presentation extraction to: {pres_output_path}")
             
         except Exception as e:
             errors.append({

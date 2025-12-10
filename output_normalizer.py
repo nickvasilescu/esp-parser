@@ -388,66 +388,78 @@ def _normalize_sage(data: Dict[str, Any]) -> UnifiedOutput:
 def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
     """Transform single SAGE product to unified format"""
     
+    # SAGE handler outputs flat structure at product level, not nested
+    # Try nested first (for consistency), then fall back to flat
     ids_data = product.get("identifiers", {})
     item_data = product.get("item", {})
-    vendor_data = product.get("vendor", {})
+    vendor_data = product.get("vendor", {}) or product.get("supplier", {}) or {}
     pricing_data = product.get("pricing", {})
     shipping_data = product.get("shipping", {})
     decoration_data = product.get("decoration", {})
     
-    # Identifiers
+    # Identifiers - SAGE has these at top level
+    # internal_item_num is the vendor's item number (MPN/SKU)
+    internal_item_num = ids_data.get("internal_item_num") or product.get("internal_item_num")
+    spc = ids_data.get("spc") or product.get("spc")
+    item_num = ids_data.get("item_num") or product.get("item_num")
+    
     identifiers = UnifiedIdentifiers(
-        mpn=item_data.get("mpn"),
-        vendor_sku=item_data.get("vendor_sku"),
-        spc=ids_data.get("spc"),
-        prod_id=ids_data.get("prod_id"),
-        encrypted_prod_id=ids_data.get("encrypted_prod_id"),
-        pres_item_id=ids_data.get("pres_item_id"),
-        internal_item_num=ids_data.get("internal_item_num"),
-        item_num=ids_data.get("item_num")
+        mpn=internal_item_num,  # internal_item_num is the MPN for SAGE
+        vendor_sku=internal_item_num,  # Use internal_item_num as vendor SKU
+        spc=spc,
+        prod_id=ids_data.get("prod_id") or product.get("prod_id"),
+        encrypted_prod_id=ids_data.get("encrypted_prod_id") or product.get("encrypted_prod_id"),
+        pres_item_id=ids_data.get("pres_item_id") or product.get("pres_item_id"),
+        internal_item_num=internal_item_num,
+        item_num=item_num
     )
     
-    # Item - SAGE has single description and category
-    category = item_data.get("category")
+    # Item - SAGE has fields at top level
+    category = item_data.get("category") or product.get("category")
     categories = [category] if category else []
     
     item = UnifiedItem(
-        name=item_data.get("name", ""),
-        description=item_data.get("description", ""),
+        name=item_data.get("name") or product.get("name", ""),
+        description=item_data.get("description") or product.get("description", ""),
         description_short=None,  # SAGE doesn't have short description
         categories=categories,
         themes=[],  # SAGE doesn't have themes
         materials=[],  # SAGE doesn't have materials
-        colors=item_data.get("colors", []),
+        colors=item_data.get("colors") or product.get("colors", []),
         primary_color=None,  # SAGE doesn't have primary color
         dimensions=UnifiedDimensions(
-            raw=item_data.get("dimensions")
-        ) if item_data.get("dimensions") else None,
+            raw=item_data.get("dimensions") or product.get("dimensions")
+        ) if (item_data.get("dimensions") or product.get("dimensions")) else None,
         weight_value=None,
         weight_unit=None
     )
     
-    # Vendor
-    vendor = UnifiedVendor(
-        name=vendor_data.get("name", ""),
-        website=vendor_data.get("website"),
-        sage_id=vendor_data.get("sage_id"),
-        email=vendor_data.get("email"),
-        phone=vendor_data.get("phone"),
-        address=UnifiedAddress(
-            city=vendor_data.get("city"),
-            state=vendor_data.get("state"),
-            postal_code=vendor_data.get("zip")
-        ) if vendor_data.get("city") else None,
-        line_name=vendor_data.get("line_name"),
-        my_customer_number=vendor_data.get("my_customer_number"),
-        my_cs_rep=vendor_data.get("my_cs_rep"),
-        my_cs_rep_email=vendor_data.get("my_cs_rep_email")
-    )
+    # Vendor - SAGE uses "supplier" at top level
+    supplier_data = vendor_data if vendor_data else {}
+    if isinstance(supplier_data, dict):
+        vendor = UnifiedVendor(
+            name=supplier_data.get("name", ""),
+            website=supplier_data.get("website"),
+            sage_id=supplier_data.get("sage_id"),
+            email=supplier_data.get("email"),
+            phone=supplier_data.get("phone"),
+            address=UnifiedAddress(
+                city=supplier_data.get("city"),
+                state=supplier_data.get("state"),
+                postal_code=supplier_data.get("zip_code") or supplier_data.get("zip")
+            ) if supplier_data.get("city") else None,
+            line_name=supplier_data.get("line_name"),
+            my_customer_number=supplier_data.get("my_customer_number"),
+            my_cs_rep=supplier_data.get("my_cs_rep"),
+            my_cs_rep_email=supplier_data.get("my_cs_rep_email")
+        )
+    else:
+        vendor = UnifiedVendor(name="")
     
-    # Pricing
+    # Pricing - SAGE has price_breaks at top level
+    price_breaks_data = pricing_data.get("breaks", []) or product.get("price_breaks", [])
     price_breaks = []
-    for brk in pricing_data.get("breaks", []):
+    for brk in price_breaks_data:
         sell_price = brk.get("sell_price")
         net_cost = brk.get("net_cost")
         
