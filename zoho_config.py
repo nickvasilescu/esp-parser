@@ -42,15 +42,16 @@ ZOHO_TOKEN_URL: str = os.getenv("ZOHO_TOKEN_URL", "https://accounts.zoho.com/oau
 # =============================================================================
 
 # Default item settings for Zoho
-# NOTE: Using "sales" item_type because "inventory" requires a category in this Zoho org
-# If categories are configured later, can switch back to "inventory"
+# NOTE: Using "sales_and_purchases" to enable both sales AND purchase information
+# This allows setting both rate (sell price) and purchase_rate (cost price)
 ZOHO_ITEM_DEFAULTS = {
-    "item_type": "sales",  # "inventory" requires category; "sales" doesn't
+    "item_type": "sales_and_purchases",  # Enable both sales and purchase info
     "product_type": "goods",
     "is_taxable": True,
     "tax_id": os.getenv("ZOHO_DEFAULT_TAX_ID"),
     "unit": "pcs",  # Default unit
     "track_inventory": False,  # Per Koell's requirements
+    "purchase_account_name": os.getenv("ZOHO_PURCHASE_ACCOUNT", "Cost of Goods Sold"),  # Account for COGS
 }
 
 

@@ -84,7 +84,7 @@ def detect_presentation_type(url: str) -> PresentationType:
     parsed = urlparse(url)
     domain = parsed.netloc.lower()
     
-    if SAGE_PRESENTATION_DOMAIN in domain or "viewpresentation" in domain:
+    if SAGE_PRESENTATION_DOMAIN in domain or "viewpresentation" in domain or "sageconnect.sage.com" in domain:
         return PresentationType.SAGE
     elif "mypromooffice.com" in domain or "portal." in domain:
         return PresentationType.ESP

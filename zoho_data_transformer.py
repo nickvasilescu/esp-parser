@@ -26,11 +26,45 @@ logger = logging.getLogger(__name__)
 # SKU/MPN Construction
 # =============================================================================
 
+def extract_numeric_account(account_string: str) -> str:
+    """
+    Extract the numeric account number from a Zoho contact_number.
+    
+    Zoho contact_number may have a prefix like "STBL-10041".
+    Per Koell's requirements, SKU should use just the numeric account: "10041".
+    
+    Args:
+        account_string: Full account string from Zoho (e.g., "STBL-10041")
+        
+    Returns:
+        Numeric account number (e.g., "10041")
+    """
+    if not account_string:
+        return "UNKNOWN"
+    
+    account_string = str(account_string).strip()
+    
+    # If it contains a hyphen, try to extract the numeric part
+    if "-" in account_string:
+        parts = account_string.split("-")
+        # Look for the numeric part (usually after alphabetic prefix)
+        for part in parts:
+            if part.isdigit():
+                return part
+        # If no pure numeric part, return the last part
+        return parts[-1]
+    
+    # If no hyphen, return as-is
+    return account_string
+
+
 def build_zoho_sku(client_account_number: str, vendor_sku: str) -> str:
     """
     Build the Zoho SKU in format [ClientAccountNumber]-[VendorSKU].
     
-    This is the unique identifier for upserts.
+    Per Koell's requirements:
+    - SKU = ClientAccountNumber + "-" + ItemNumber
+    - Example: "10041-75610" (not "STBL-10041-75610")
     
     Args:
         client_account_number: Client's account number from Zoho Contacts
@@ -39,8 +73,8 @@ def build_zoho_sku(client_account_number: str, vendor_sku: str) -> str:
     Returns:
         Formatted SKU string
     """
-    # Clean up inputs
-    client_num = str(client_account_number).strip() if client_account_number else "UNKNOWN"
+    # Extract numeric account number (strips prefix like "STBL-")
+    client_num = extract_numeric_account(client_account_number)
     v_sku = str(vendor_sku).strip() if vendor_sku else "UNKNOWN"
     
     return f"{client_num}-{v_sku}"
@@ -336,9 +370,12 @@ def build_item_payload(
         "sku": zoho_sku,
         "description": description,
         
-        # Pricing
+        # Pricing - Sales Information
         "rate": sell_price,           # Selling price (what customer pays)
-        "purchase_rate": net_cost,    # Cost price (what we pay)
+        
+        # Purchase Information - Enabled by item_type="sales_and_purchases"
+        "purchase_rate": net_cost,    # Cost price (what we pay to distributor)
+        "purchase_account_name": ZOHO_ITEM_DEFAULTS.get("purchase_account_name", "Cost of Goods Sold"),  # Purchase account
         
         # Item type settings from defaults
         "item_type": ZOHO_ITEM_DEFAULTS["item_type"],
@@ -350,9 +387,9 @@ def build_item_payload(
         # Zoho requires a category. By omitting it, Zoho uses its default.
     }
     
-    # Add MPN if available
+    # Add MPN as part_number (Zoho API field name)
     if mpn:
-        payload["mpn"] = mpn
+        payload["part_number"] = mpn
     
     # Add category if provided
     if category_id:

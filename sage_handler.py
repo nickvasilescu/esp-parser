@@ -331,26 +331,36 @@ class SAGEAPIClient:
 # URL Parser
 # =============================================================================
 
-def extract_pres_id_from_url(url: str) -> int:
+def extract_pres_id_from_url(url: str) -> int | str:
     """
-    Extract presentation ID from viewpresentation.com URL.
+    Extract presentation ID from SAGE presentation URL.
     
-    The URL format is: https://www.viewpresentation.com/XXXXXXXXXXX
-    Where the number contains the presId (typically after stripping a prefix).
+    Supports two URL formats:
+    1. viewpresentation.com: https://www.viewpresentation.com/XXXXXXXXXXX
+       Where the number contains the presId (typically after stripping a prefix).
+       Example: URL: 66907679185 → presId: 7679185 (strip first 4 chars)
     
-    Examples:
-        URL: 66907679185 → presId: 7679185 (strip first 4 chars)
+    2. sageconnect.sage.com: https://sageconnect.sage.com/Presentation/XXXXXX
+       Where XXXXXX is an alphanumeric presentation code.
+       Example: URL: .../Presentation/6GMWK4 → code: 6GMWK4
     
     Args:
-        url: Full viewpresentation.com URL
+        url: Full SAGE presentation URL
         
     Returns:
-        Presentation ID
+        Presentation ID (int for viewpresentation, str for sageconnect)
         
     Raises:
         ValueError: If URL format is invalid
     """
-    # Extract the number from URL
+    # Try sageconnect.sage.com format first (alphanumeric code)
+    sageconnect_match = re.search(r'sageconnect\.sage\.com/Presentation/([A-Za-z0-9]+)', url)
+    if sageconnect_match:
+        pres_code = sageconnect_match.group(1)
+        logger.info(f"Extracted presentation code '{pres_code}' from sageconnect URL")
+        return pres_code
+    
+    # Try viewpresentation.com format (numeric ID)
     match = re.search(r'viewpresentation\.com/(\d+)', url)
     if not match:
         raise ValueError(f"Invalid SAGE presentation URL: {url}")
@@ -782,6 +792,20 @@ class SAGEHandler:
             logger.info("Step 1: Extracting presentation ID from URL...")
             pres_id = extract_pres_id_from_url(self.presentation_url)
             logger.info(f"  Presentation ID: {pres_id}")
+            
+            # If pres_id is a string (sageconnect URL with alphanumeric code),
+            # fall back to scraper since SAGE API expects numeric presId
+            if isinstance(pres_id, str):
+                logger.warning(f"Alphanumeric presentation code '{pres_id}' detected (sageconnect URL)")
+                logger.warning("SAGE API requires numeric presId - falling back to web scraper")
+                if use_scraper_fallback:
+                    return self._process_with_scraper()
+                else:
+                    return SAGEResult(
+                        success=False,
+                        presentation_url=self.presentation_url,
+                        error=f"sageconnect.sage.com URLs with alphanumeric codes require scraper. Code: {pres_id}"
+                    )
             
             # Step 2: Call SAGE Presentation API (gets SELL PRICES)
             logger.info("Step 2: Calling SAGE Presentation API...")

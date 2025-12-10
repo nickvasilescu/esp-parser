@@ -280,18 +280,45 @@ class ZohoClient:
         """
         Get an item by SKU.
         
+        Handles SKU format migration by searching for both:
+        - New format: "10041-CE053"
+        - Old format: "STBL-10041-CE053"
+        
         Args:
-            sku: Item SKU
+            sku: Item SKU (new format)
             
         Returns:
             Item data or None if not found
         """
+        # Try exact match first
         items = self.get_items(sku=sku)
         if items:
-            # Return first exact match
             for item in items:
                 if item.get("sku") == sku:
                     return item
+        
+        # Try with "STBL-" prefix (old format migration)
+        old_format_sku = f"STBL-{sku}"
+        items = self.get_items(sku=old_format_sku)
+        if items:
+            for item in items:
+                if item.get("sku") == old_format_sku:
+                    logger.info(f"Found item with old SKU format: {old_format_sku} -> will update")
+                    return item
+        
+        # Try searching by the item number (last part of SKU) using search_text
+        # This helps find items even if SKU format varies
+        if "-" in sku:
+            item_num = sku.split("-")[-1]  # Get the vendor item number
+            items = self.get_items(search_text=item_num)
+            if items:
+                # Look for items where SKU ends with this item number
+                for item in items:
+                    item_sku = item.get("sku", "")
+                    if item_sku.endswith(f"-{item_num}"):
+                        logger.info(f"Found item by item number search: {item_sku}")
+                        return item
+        
         return None
     
     def create_item(self, item_data: Dict[str, Any]) -> Dict[str, Any]:
