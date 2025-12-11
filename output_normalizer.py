@@ -485,13 +485,38 @@ def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
         price_includes=pricing_data.get("price_includes")
     )
     
-    # Fees - SAGE has simpler fee structure
+    # Fees - SAGE has individual fee fields, not a fees[] array
     fees = []
+    
+    # Map SAGE individual fee fields to UnifiedFee objects
+    sage_fee_mapping = [
+        ("setup_charge", "setup", "Setup Charge"),
+        ("repeat_charge", "repeat", "Repeat/Reorder Charge"),
+        ("screen_charge", "screen", "Screen Charge"),
+        ("proof_charge", "proof", "Proof Charge"),
+        ("pms_charge", "pms", "PMS Color Match Charge"),
+        ("spec_sample_charge", "sample", "Spec Sample Charge"),
+        ("copy_change_charge", "copy_change", "Copy Change Charge"),
+    ]
+    
+    for field_name, fee_type, fee_name in sage_fee_mapping:
+        value = product.get(field_name)
+        if value and value > 0:
+            fees.append(UnifiedFee(
+                fee_type=fee_type,
+                name=fee_name,
+                list_price=value,
+                net_cost=value,  # For SAGE, assume same as list for now
+                charge_basis="per_order",
+                price_code=product.get("setup_charge_code") if fee_type == "setup" else None
+            ))
+    
+    # Also check for any pre-structured fees array
     for fee in product.get("fees", []):
         fees.append(UnifiedFee(
             fee_type=fee.get("fee_type", "other"),
             name=fee.get("name", ""),
-            list_price=fee.get("price"),  # SAGE uses "price" not "list_price"
+            list_price=fee.get("price"),
             price_code=fee.get("price_code")
         ))
     
@@ -515,19 +540,23 @@ def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
         # Try to extract lead time from packaging string
         lead_time = packaging  # Keep full string for now
     
+    # Get additional_charges_text for both shipping and notes
+    additional_charges_text = product.get("additional_charges_text", "")
+    
     shipping = UnifiedShipping(
         ship_point=ship_point,
         fob_points=fob_points,
         units_per_carton=shipping_data.get("units_per_carton"),
         weight_per_carton=shipping_data.get("weight_per_carton"),
         packaging=packaging,
-        lead_time=lead_time
+        lead_time=lead_time,
+        additional_charges_text=additional_charges_text  # For fee parser
     )
     
     # Notes
     notes = UnifiedNotes(
         packaging=packaging,
-        additional_charges_text=product.get("additional_charges_text")
+        additional_charges_text=additional_charges_text
     )
     
     # Images

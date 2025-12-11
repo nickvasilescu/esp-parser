@@ -39,13 +39,19 @@ from zoho_config import (
 )
 from zoho_client import ZohoClient, ZohoAPIError, create_zoho_client
 from zoho_data_transformer import (
-    build_zoho_sku,
+    build_item_name_sku,
+    get_base_code,
     get_vendor_sku,
     get_mpn,
     extract_base_pricing,
+    extract_all_price_tiers,
     map_custom_fields,
     build_item_payload,
     validate_item_payload,
+    explode_product_variations,
+    build_fee_items,
+    prepare_products_for_zoho,
+    extract_numeric_account,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,7 +122,7 @@ AGENT_TOOLS = [
     },
     {
         "name": "upsert_item",
-        "description": "Create or update an item in Zoho Item Master. If an item with the same SKU exists, it will be updated; otherwise, a new item is created.",
+        "description": "Create or update items in Zoho Item Master with FULL variation and fee expansion. This creates SEPARATE Zoho items for: (1) Each product variation (color, size, decoration method), (2) Each fee (setup, rush, additional charges). Returns count of items and fees created.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -127,6 +133,16 @@ AGENT_TOOLS = [
                 "client_account_number": {
                     "type": "string",
                     "description": "Client account number for SKU construction"
+                },
+                "include_variations": {
+                    "type": "boolean",
+                    "description": "Create separate items for each color/size/decoration variation. Default: false (Koell wants base item only).",
+                    "default": False
+                },
+                "include_fees": {
+                    "type": "boolean",
+                    "description": "Create separate items for fees (setup, rush, etc). Default: true",
+                    "default": True
                 }
             },
             "required": ["product_index", "client_account_number"]
@@ -156,6 +172,50 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {}
+        }
+    },
+    {
+        "name": "create_item_pricebooks",
+        "description": "Create sales and purchase pricebooks for an item with quantity-based tiered pricing. Call this AFTER upserting the item to set up tiered pricing for quotes.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "item_id": {
+                    "type": "string",
+                    "description": "Zoho item ID returned from upsert_item"
+                },
+                "item_sku": {
+                    "type": "string",
+                    "description": "Item SKU (name) for pricebook naming"
+                },
+                "client_account": {
+                    "type": "string",
+                    "description": "Client account number for pricebook naming"
+                },
+                "sales_tiers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "quantity": {"type": "integer"},
+                            "rate": {"type": "number"}
+                        }
+                    },
+                    "description": "Sales price tiers from presentation (qty/rate pairs)"
+                },
+                "purchase_tiers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "quantity": {"type": "integer"},
+                            "rate": {"type": "number"}
+                        }
+                    },
+                    "description": "Purchase cost tiers from distributor report (qty/rate pairs)"
+                }
+            },
+            "required": ["item_id", "item_sku", "client_account"]
         }
     },
     {
@@ -199,15 +259,24 @@ AGENT_SYSTEM_PROMPT = """You are a Zoho Item Master Management Agent. Your task 
 
 4. **Fourth**: For each product in the unified output:
    - Call upsert_item with the product index and client account number
+   - The system automatically expands products into variations (color/size/decoration method)
+   - Each variation becomes a separate item with name/SKU format: <clientAccountId>-<baseCode>-<color>-<size>-<decoMethod>
+   - Fee items are also created as separate products
+   - After item upsert, call create_item_pricebooks to set up quantity-based tiered pricing
    - If the product has images and upload succeeds, call upload_item_image
 
 5. **Finally**: Call report_completion with a summary of the results.
 
 ## Key Business Rules
 
-- **SKU Format**: [ClientAccountNumber]-[VendorSKU] - this is the unique identifier for upserts
-- **MPN**: Set to vendor_sku - this appears on Purchase Orders
-- **Pricing**: Use base tier (first quantity break) for rate (sell) and purchase_rate (cost)
+- **Name = SKU**: Both name and SKU use the same format: <clientAccountId>-<baseCode>-<color>-<size>-<decoMethod>
+  - Example: "10041-996M-BLKHEATHER-4X-EMBOSSED"
+- **Variations**: Each color/size/decoration combo becomes a separate item
+- **Fees**: Setup charges, additional color fees, etc. become separate fee items
+- **MPN (part_number)**: Set to vendor's actual item number for Purchase Orders
+- **Tiered Pricing**: After item creation, call create_item_pricebooks with price tiers from the data
+  - Sales tiers from presentation sell_price breaks
+  - Purchase tiers from distributor net_cost breaks
 - **Inventory**: Always disabled (track_inventory = false)
 - **Custom Fields**: Only populate fields that were discovered to exist
 - **Images**: Upload primary image if available (SAGE products typically have images)
@@ -217,6 +286,7 @@ AGENT_SYSTEM_PROMPT = """You are a Zoho Item Master Management Agent. Your task 
 - If client contact is not found, use "UNKNOWN" as account number and continue
 - If custom field discovery fails, continue without custom fields
 - If individual item upload fails, log the error and continue with other items
+- If pricebook creation fails, log error but item creation still counts as success
 - If image upload fails, log but don't fail the entire item
 
 ## Important Notes
@@ -303,6 +373,9 @@ class ZohoItemMasterAgent:
             elif tool_name == "get_categories":
                 return self._tool_get_categories()
             
+            elif tool_name == "create_item_pricebooks":
+                return self._tool_create_item_pricebooks(tool_input)
+            
             elif tool_name == "report_completion":
                 return self._tool_report_completion(tool_input)
             
@@ -365,9 +438,17 @@ class ZohoItemMasterAgent:
             })
     
     def _tool_upsert_item(self, tool_input: Dict[str, Any]) -> str:
-        """Upsert an item to Zoho."""
+        """
+        Upsert an item to Zoho with full variation and fee expansion.
+        
+        Creates separate Zoho items for:
+        1. Each product variation (color, size, decoration method)
+        2. Each fee associated with the product
+        """
         product_index = tool_input.get("product_index")
         client_account_number = tool_input.get("client_account_number")
+        include_variations = tool_input.get("include_variations", False)
+        include_fees = tool_input.get("include_fees", True)
         
         if self._unified_output is None:
             return json.dumps({"error": "No unified output loaded"})
@@ -377,21 +458,19 @@ class ZohoItemMasterAgent:
             return json.dumps({"error": f"Invalid product index: {product_index}"})
         
         product = products[product_index]
+        product_name = product.get("item", {}).get("name", "Unknown")
         
         try:
-            # Get vendor SKU
-            vendor_sku = get_vendor_sku(product)
-            if not vendor_sku:
+            # Get base code for naming
+            base_code = get_base_code(product)
+            if not base_code:
                 result = ItemUploadResult(
                     success=False,
                     zoho_sku="",
-                    error="No vendor SKU found in product data"
+                    error="No base code found in product data"
                 )
                 self._results.append(result)
                 return json.dumps({"success": False, "error": result.error})
-            
-            # Build Zoho SKU
-            zoho_sku = build_zoho_sku(client_account_number, vendor_sku)
             
             # Find category if available
             category_id = None
@@ -401,51 +480,121 @@ class ZohoItemMasterAgent:
                     category_id = self._category_map[cat]
                     break
             
-            # Build payload
-            payload = build_item_payload(
-                product=product,
-                zoho_sku=zoho_sku,
-                client_account_number=client_account_number,
-                discovered_fields=self._discovered_fields,
-                category_id=category_id
-            )
+            # === STEP 1: Explode variations (disabled by default) ===
+            if include_variations:
+                variations = explode_product_variations(product)
+            else:
+                variations = [{}]  # Single base item (Koell: avoid variant explosion)
             
-            # Remove internal metadata before sending to Zoho
-            payload.pop("_source_identifiers", None)
-            payload.pop("_source", None)
+            logger.info(f"Product '{product_name}': {len(variations)} variation(s)")
             
-            # Validate
-            errors = validate_item_payload(payload)
-            if errors:
+            # === STEP 2: Create items for each variation ===
+            created_items = []
+            for variation in variations:
+                payload = build_item_payload(
+                    product=product,
+                    client_account_number=client_account_number,
+                    discovered_fields=self._discovered_fields,
+                    variation=variation if variation else None,
+                    category_id=category_id
+                )
+                
+                # Extract and remove metadata
+                price_tiers = payload.pop("_price_tiers", {"sales_tiers": [], "purchase_tiers": []})
+                payload.pop("_variation", None)
+                original_name = payload.pop("_original_name", "")
+                payload.pop("_is_variation", None)
+                payload.pop("_fee_type", None)
+                payload.pop("_source_product", None)
+                payload.pop("_parsed_from", None)
+                payload.pop("_source_identifiers", None)
+                payload.pop("_source", None)
+                payload.pop("_percent", None)
+                
+                zoho_sku = payload.get("sku", "")
+                
+                # Validate
+                errors = validate_item_payload(payload)
+                if errors:
+                    logger.warning(f"Validation failed for {zoho_sku}: {errors}")
+                    continue
+                
+                # Upsert to Zoho
+                zoho_item = self.zoho_client.upsert_item(payload)
+                
                 result = ItemUploadResult(
-                    success=False,
+                    success=True,
                     zoho_sku=zoho_sku,
-                    error=f"Validation failed: {'; '.join(errors)}"
+                    item_id=zoho_item.get("item_id"),
+                    action="created"
                 )
                 self._results.append(result)
-                return json.dumps({"success": False, "error": result.error})
+                
+                created_items.append({
+                    "item_id": zoho_item.get("item_id"),
+                    "sku": zoho_sku,
+                    "variation": variation,
+                    "type": "product"
+                })
             
-            # Upsert to Zoho
-            zoho_item = self.zoho_client.upsert_item(payload)
-            
-            # Determine if created or updated
-            action = "updated" if self.zoho_client.get_item_by_sku(zoho_sku) else "created"
-            
-            result = ItemUploadResult(
-                success=True,
-                zoho_sku=zoho_sku,
-                item_id=zoho_item.get("item_id"),
-                action=action
-            )
-            self._results.append(result)
+            # === STEP 3: Create fee items ===
+            fee_items_created = []
+            if include_fees:
+                fee_payloads = build_fee_items(
+                    product=product,
+                    client_account_number=client_account_number,
+                    discovered_fields=self._discovered_fields
+                )
+                
+                logger.info(f"Product '{product_name}': {len(fee_payloads)} fee item(s)")
+                
+                for fee_payload in fee_payloads:
+                    # Extract and remove metadata
+                    fee_type = fee_payload.pop("_fee_type", None)
+                    fee_payload.pop("_source_product", None)
+                    fee_payload.pop("_parsed_from", None)
+                    fee_payload.pop("_percent", None)
+                    
+                    fee_sku = fee_payload.get("sku", "")
+                    
+                    # Validate
+                    errors = validate_item_payload(fee_payload)
+                    if errors:
+                        logger.warning(f"Fee validation failed for {fee_sku}: {errors}")
+                        continue
+                    
+                    # Upsert fee to Zoho
+                    try:
+                        zoho_fee_item = self.zoho_client.upsert_item(fee_payload)
+                        
+                        fee_result = ItemUploadResult(
+                            success=True,
+                            zoho_sku=fee_sku,
+                            item_id=zoho_fee_item.get("item_id"),
+                            action="created"
+                        )
+                        self._results.append(fee_result)
+                        
+                        fee_items_created.append({
+                            "item_id": zoho_fee_item.get("item_id"),
+                            "sku": fee_sku,
+                            "fee_type": fee_type,
+                            "type": "fee"
+                        })
+                    except Exception as e:
+                        logger.error(f"Failed to create fee item {fee_sku}: {e}")
             
             return json.dumps({
                 "success": True,
-                "item_id": result.item_id,
-                "sku": zoho_sku,
-                "action": action,
-                "name": payload.get("name"),
-                "has_images": len(product.get("images", [])) > 0
+                "product_name": product_name,
+                "base_code": base_code,
+                "client_account": client_account_number,
+                "variations_created": len(created_items),
+                "fees_created": len(fee_items_created),
+                "items": created_items,
+                "fee_items": fee_items_created,
+                "has_images": len(product.get("images", [])) > 0,
+                "summary": f"Created {len(created_items)} product variation(s) + {len(fee_items_created)} fee item(s)"
             })
             
         except ZohoAPIError as e:
@@ -502,6 +651,50 @@ class ZohoItemMasterAgent:
                 "success": False,
                 "error": str(e),
                 "message": "Could not fetch categories. Products will be uploaded without category."
+            })
+    
+    def _tool_create_item_pricebooks(self, tool_input: Dict[str, Any]) -> str:
+        """Create sales and purchase pricebooks for an item with tiered pricing."""
+        item_id = tool_input.get("item_id")
+        item_sku = tool_input.get("item_sku")
+        client_account = tool_input.get("client_account")
+        sales_tiers = tool_input.get("sales_tiers", [])
+        purchase_tiers = tool_input.get("purchase_tiers", [])
+        
+        if not item_id or not item_sku or not client_account:
+            return json.dumps({
+                "success": False,
+                "error": "item_id, item_sku, and client_account are required"
+            })
+        
+        try:
+            result = self.zoho_client.create_item_pricebooks(
+                item_id=item_id,
+                item_sku=item_sku,
+                client_account=client_account,
+                sales_tiers=sales_tiers,
+                purchase_tiers=purchase_tiers
+            )
+            
+            return json.dumps({
+                "success": True,
+                "sales_pricebook": result.get("sales_pricebook", {}).get("name") if result.get("sales_pricebook") else None,
+                "purchase_pricebook": result.get("purchase_pricebook", {}).get("name") if result.get("purchase_pricebook") else None,
+                "errors": result.get("errors", []),
+                "message": "Pricebooks created/updated successfully" if not result.get("errors") else f"Pricebooks created with {len(result.get('errors', []))} error(s)"
+            })
+            
+        except ZohoAPIError as e:
+            return json.dumps({
+                "success": False,
+                "error": str(e),
+                "message": "Failed to create pricebooks"
+            })
+        except Exception as e:
+            return json.dumps({
+                "success": False,
+                "error": str(e),
+                "message": "Unexpected error creating pricebooks"
             })
     
     def _tool_report_completion(self, tool_input: Dict[str, Any]) -> str:

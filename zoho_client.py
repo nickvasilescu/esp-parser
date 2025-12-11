@@ -276,48 +276,64 @@ class ZohoClient:
         response = self._make_request("GET", f"/items/{item_id}")
         return response.get("item", {})
     
-    def get_item_by_sku(self, sku: str) -> Optional[Dict[str, Any]]:
+    def get_item_by_sku(self, sku: str, item_name: str = None, part_number: str = None) -> Optional[Dict[str, Any]]:
         """
-        Get an item by SKU.
+        Get an item by SKU with STRICT matching.
         
-        Handles SKU format migration by searching for both:
-        - New format: "10041-CE053"
-        - Old format: "STBL-10041-CE053"
+        Only returns an item if it's a true match - avoids overwriting
+        different products that share partial SKU components.
+        
+        Matching priority:
+        1. Exact SKU match
+        2. Exact name match (since name = SKU in new format)
+        3. Old STBL- format match (for migration only)
         
         Args:
             sku: Item SKU (new format)
+            item_name: Optional item name for fallback search
+            part_number: Optional part number (MPN) for fallback search
             
         Returns:
             Item data or None if not found
         """
-        # Try exact match first
+        # Try exact SKU match first
         items = self.get_items(sku=sku)
         if items:
             for item in items:
                 if item.get("sku") == sku:
                     return item
         
-        # Try with "STBL-" prefix (old format migration)
-        old_format_sku = f"STBL-{sku}"
-        items = self.get_items(sku=old_format_sku)
-        if items:
-            for item in items:
-                if item.get("sku") == old_format_sku:
-                    logger.info(f"Found item with old SKU format: {old_format_sku} -> will update")
-                    return item
-        
-        # Try searching by the item number (last part of SKU) using search_text
-        # This helps find items even if SKU format varies
-        if "-" in sku:
-            item_num = sku.split("-")[-1]  # Get the vendor item number
-            items = self.get_items(search_text=item_num)
+        # Try exact name match (since name = SKU in new format)
+        if item_name:
+            items = self.get_items(name=item_name)
             if items:
-                # Look for items where SKU ends with this item number
+                for item in items:
+                    if item.get("name") == item_name:
+                        logger.info(f"Found item by exact name match: {item_name}")
+                        return item
+        
+        # Try with "STBL-" prefix (old SAGE format migration only)
+        # Extract base SKU components: <client>-<baseCode> without variations
+        sku_parts = sku.split("-")
+        if len(sku_parts) >= 2:
+            client_id = sku_parts[0]
+            base_code = sku_parts[1]
+            old_format_sku = f"STBL-{client_id}-{base_code}"
+            
+            items = self.get_items(search_text=old_format_sku)
+            if items:
                 for item in items:
                     item_sku = item.get("sku", "")
-                    if item_sku.endswith(f"-{item_num}"):
-                        logger.info(f"Found item by item number search: {item_sku}")
+                    # Must match client + base code exactly
+                    if item_sku.startswith(old_format_sku):
+                        logger.info(f"Found item with old STBL- format: {item_sku} -> will update to {sku}")
                         return item
+        
+        # NOTE: Removed loose fallback searches that were causing overwrites!
+        # The old logic matched ANY item ending with the same color/variation,
+        # which caused different products to overwrite each other.
+        # 
+        # If we reach here, we should CREATE a new item, not find a wrong match.
         
         return None
     
@@ -366,7 +382,12 @@ class ZohoClient:
         # Try to find existing item
         existing_item = None
         if unique_field == "sku":
-            existing_item = self.get_item_by_sku(unique_value)
+            # Pass additional fields for fallback searches (handles SKU migrations)
+            existing_item = self.get_item_by_sku(
+                unique_value,
+                item_name=item_data.get("name"),
+                part_number=item_data.get("part_number")
+            )
         else:
             # For custom fields, search by the field value
             items = self.get_items(search_text=unique_value)

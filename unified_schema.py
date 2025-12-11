@@ -264,6 +264,8 @@ class UnifiedShipping:
     packaging: Optional[str] = None
     lead_time: Optional[str] = None
     rush_available: Optional[bool] = None
+    additional_charges_text: Optional[str] = None  # For fee parsing
+    supplier_disclaimers: List[str] = field(default_factory=list)  # For fee parsing
 
 
 @dataclass

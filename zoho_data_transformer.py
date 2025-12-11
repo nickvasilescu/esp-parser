@@ -84,7 +84,8 @@ def get_vendor_sku(product: Dict[str, Any]) -> Optional[str]:
     """
     Extract vendor SKU from unified product data.
     
-    Checks multiple possible locations in the unified schema.
+    For ESP: Uses CPN (Client Product Number) as the SKU identifier
+    For SAGE: Uses vendor_sku/mpn/item_num as the SKU identifier
     
     Args:
         product: Unified product dictionary
@@ -92,8 +93,20 @@ def get_vendor_sku(product: Dict[str, Any]) -> Optional[str]:
     Returns:
         Vendor SKU if found, None otherwise
     """
-    # Check identifiers first (preferred location)
     identifiers = product.get("identifiers", {})
+    source = product.get("source", "").lower()
+    
+    # ESP: Use CPN as the primary SKU identifier
+    if source == "esp":
+        if identifiers.get("cpn"):
+            return identifiers["cpn"]
+        # Fallback for ESP if no CPN
+        if identifiers.get("vendor_sku"):
+            return identifiers["vendor_sku"]
+        if identifiers.get("mpn"):
+            return identifiers["mpn"]
+    
+    # SAGE and others: Use vendor_sku/mpn/item_num
     if identifiers.get("vendor_sku"):
         return identifiers["vendor_sku"]
     if identifiers.get("mpn"):
@@ -136,6 +149,400 @@ def get_mpn(product: Dict[str, Any]) -> Optional[str]:
         return identifiers["item_num"]
     
     return get_vendor_sku(product)
+
+
+def get_base_code(product: Dict[str, Any]) -> Optional[str]:
+    """
+    Get the base code for product identification.
+    
+    Alias for get_vendor_sku for backward compatibility.
+    
+    Args:
+        product: Unified product dictionary
+        
+    Returns:
+        Base code (CPN for ESP, vendor_sku for SAGE)
+    """
+    return get_vendor_sku(product)
+
+
+def extract_all_price_tiers(product: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Extract all price tiers (sales and purchase) from product.
+    
+    Args:
+        product: Unified product dictionary
+        
+    Returns:
+        Dict with sales_tiers and purchase_tiers lists
+    """
+    pricing = product.get("pricing", {})
+    breaks = pricing.get("breaks", [])
+    
+    sales_tiers = []
+    purchase_tiers = []
+    
+    for brk in sorted(breaks, key=lambda b: b.get("quantity", 0)):
+        qty = brk.get("quantity")
+        if qty is None:
+            continue
+            
+        # Sales tier (sell_price)
+        sell_price = brk.get("sell_price") or brk.get("catalog_price")
+        if sell_price is not None:
+            sales_tiers.append({"quantity": qty, "rate": sell_price})
+        
+        # Purchase tier (net_cost)
+        net_cost = brk.get("net_cost")
+        if net_cost is not None:
+            purchase_tiers.append({"quantity": qty, "rate": net_cost})
+    
+    return {
+        "sales_tiers": sales_tiers,
+        "purchase_tiers": purchase_tiers
+    }
+
+
+# =============================================================================
+# New Name/SKU Format (identical name and SKU)
+# =============================================================================
+
+def sanitize_for_sku(text: str, max_length: int = 50) -> str:
+    """
+    Sanitize text for use in SKU/name.
+    
+    Removes special characters, replaces spaces with nothing,
+    and truncates to max_length.
+    
+    Args:
+        text: Input text
+        max_length: Maximum length
+        
+    Returns:
+        Sanitized string
+    """
+    import re
+    if not text:
+        return ""
+    # Remove special characters except alphanumeric and hyphen
+    cleaned = re.sub(r'[^a-zA-Z0-9\-]', '', text.replace(' ', '').replace('/', '-'))
+    # Remove consecutive hyphens
+    cleaned = re.sub(r'-+', '-', cleaned)
+    # Remove leading/trailing hyphens
+    cleaned = cleaned.strip('-')
+    return cleaned[:max_length]
+
+
+def build_item_name_sku(
+    client_account_number: str,
+    product: Dict[str, Any],
+    variation: Optional[Dict[str, str]] = None
+) -> str:
+    """
+    Build SKU in simplified format: <clientAcctId>-<baseCode>
+    
+    Koell's requirement: keep Item Master SKU minimal (no colors/sizes),
+    while names remain the product title.
+    
+    Args:
+        client_account_number: Client's account number
+        product: Unified product dictionary
+        variation: Unused for SKU (kept for signature compatibility)
+        
+    Returns:
+        SKU string
+    """
+    client_num = extract_numeric_account(client_account_number)
+    base_code = get_vendor_sku(product) or "UNKNOWN"
+    return f"{client_num}-{base_code}"
+
+
+def explode_product_variations(product: Dict[str, Any]) -> List[Dict[str, str]]:
+    """
+    Explode a product into all its variations.
+    
+    Creates one entry per color, size, or decoration method combination.
+    If no variations exist, returns a single empty dict (base product).
+    
+    Args:
+        product: Unified product dictionary
+        
+    Returns:
+        List of variation dictionaries with color, size, decoration keys
+    """
+    item = product.get("item", {})
+    decoration = product.get("decoration", {})
+    
+    colors = item.get("colors", [])
+    # Note: sizes might be in different places depending on source
+    sizes = item.get("sizes", [])
+    
+    # Get decoration methods
+    deco_methods = []
+    for method in decoration.get("methods", []):
+        if isinstance(method, dict):
+            deco_methods.append(method.get("name", ""))
+        elif isinstance(method, str):
+            deco_methods.append(method)
+    deco_methods = [m for m in deco_methods if m]  # Filter empty
+    
+    variations = []
+    
+    # If we have colors, create one item per color
+    if colors:
+        for color in colors:
+            variation = {"color": color}
+            # Add first decoration method if available
+            if deco_methods:
+                variation["decoration"] = deco_methods[0]
+            variations.append(variation)
+    # If we have sizes but no colors
+    elif sizes:
+        for size in sizes:
+            variation = {"size": size}
+            if deco_methods:
+                variation["decoration"] = deco_methods[0]
+            variations.append(variation)
+    # If we have decoration methods but no colors/sizes
+    elif deco_methods:
+        for deco in deco_methods:
+            variations.append({"decoration": deco})
+    # No variations - single base product
+    else:
+        variations.append({})
+    
+    return variations
+
+
+# =============================================================================
+# Fee Parsing and Item Creation
+# =============================================================================
+
+import re
+
+def parse_additional_charges_text(text: str) -> List[Dict[str, Any]]:
+    """
+    Parse additional_charges_text field to extract structured fees.
+    
+    Handles formats like:
+    - "Setup: $57.50"
+    - "Additional Color Run (+0.35), Additional Color Set Up (+60.00)"
+    - "RUSH: 5 Day (20%), 3 Day (30%)"
+    - "Imprint: Laser Engraving (+1.30)"
+    - "Laser Engraved Personalization up to 2 Lines (per piece) (+1.30)"
+    
+    Args:
+        text: Raw additional_charges_text string
+        
+    Returns:
+        List of fee dictionaries with name, price, fee_type
+    """
+    if not text:
+        return []
+    
+    fees = []
+    
+    # Pattern for "Setup: $XX.XX" or "Setup: XX.XX"
+    setup_pattern = r'Setup:\s*\$?([\d.]+)'
+    setup_match = re.search(setup_pattern, text, re.IGNORECASE)
+    if setup_match:
+        fees.append({
+            "fee_type": "setup",
+            "name": "Setup Charge",
+            "price": float(setup_match.group(1)),
+            "description": f"Setup charge extracted from additional_charges_text"
+        })
+    
+    # Pattern for "(+XX.XX)" or "(+$XX.XX)" charges with preceding name
+    # More flexible to handle text like "Name (per piece) (+1.30)"
+    addon_pattern = r'([A-Za-z][A-Za-z0-9\s\(\)]+?)\s*\(\+\$?([\d.]+)\)'
+    for match in re.finditer(addon_pattern, text):
+        name = match.group(1).strip()
+        price = float(match.group(2))
+        
+        # Skip if name is too short or is just "(per piece)" etc
+        if len(name) < 3:
+            continue
+        
+        # Determine fee type based on name
+        fee_type = "addon"
+        name_lower = name.lower()
+        if "color" in name_lower:
+            fee_type = "additional_color"
+        elif "personalization" in name_lower:
+            fee_type = "personalization"
+        elif "imprint" in name_lower or "engraving" in name_lower or "laser" in name_lower:
+            fee_type = "imprint"
+        elif "line" in name_lower:
+            fee_type = "personalization"
+        
+        fees.append({
+            "fee_type": fee_type,
+            "name": name,
+            "price": price,
+            "description": f"Add-on fee: {name}"
+        })
+    
+    # Pattern for "RUSH: X Day (XX%)" or "X Day (XX%)"
+    rush_pattern = r'(\d+)\s*Day\s*\((\d+)%\)'
+    for match in re.finditer(rush_pattern, text, re.IGNORECASE):
+        days = match.group(1)
+        percent = match.group(2)
+        fees.append({
+            "fee_type": "rush",
+            "name": f"Rush {days} Day ({percent}%)",
+            "price": None,  # Percentage-based
+            "percent": float(percent),
+            "description": f"Rush fee: {days} day turnaround at {percent}% upcharge"
+        })
+    
+    # Pattern for tiered pricing "Blank (250:1.55, 500:1.49, ...)"
+    # This indicates quantity-based pricing info but not fees
+    
+    # Pattern for PMS match - "PMS: $XX" or "PMS Match: $XX"
+    pms_pattern = r'PMS(?:\s*Match)?:\s*\$?([\d.]+)'
+    pms_match = re.search(pms_pattern, text, re.IGNORECASE)
+    if pms_match:
+        fees.append({
+            "fee_type": "pms",
+            "name": "PMS Color Match",
+            "price": float(pms_match.group(1)),
+            "description": "PMS color matching fee"
+        })
+    
+    return fees
+
+
+def build_fee_items(
+    product: Dict[str, Any],
+    client_account_number: str,
+    discovered_fields: Dict[str, Optional[str]]
+) -> List[Dict[str, Any]]:
+    """
+    Build Zoho item payloads for all fees associated with a product.
+    
+    Extracts fees from:
+    1. product.fees[] (structured fee data)
+    2. product.shipping.additional_charges_text (parsed)
+    3. product.shipping.supplier_disclaimers (fee-related)
+    
+    Args:
+        product: Unified product dictionary
+        client_account_number: Client's Zoho account number
+        discovered_fields: Dict of discovered custom field IDs
+        
+    Returns:
+        List of Zoho item payloads for fees
+    """
+    fee_items = []
+    client_num = extract_numeric_account(client_account_number)
+    base_code = get_vendor_sku(product) or "UNKNOWN"
+    product_name = product.get("item", {}).get("name", "Item")
+    
+    # 1. Process structured fees from fees[]
+    structured_fees = product.get("fees", [])
+    for fee in structured_fees:
+        fee_type = sanitize_for_sku(fee.get("fee_type", "FEE"), 15)
+        fee_name = fee.get("name", "Fee")
+        deco_method = fee.get("decoration_method", "")
+        
+        # Build SKU/name
+        sku_parts = [client_num, "FEE", fee_type.upper(), base_code]
+        if deco_method:
+            sku_parts.append(sanitize_for_sku(deco_method, 15))
+        sku = "-".join(sku_parts)
+        
+        # Build descriptive name
+        name = f"{client_num}-FEE-{fee_type.upper()}-{fee_name}"
+        if deco_method:
+            name += f" ({deco_method})"
+        
+        payload = {
+            "name": sku,  # name = sku
+            "sku": sku,
+            "description": fee.get("description", fee_name),
+            "rate": fee.get("list_price"),
+            "purchase_rate": fee.get("net_cost"),
+            "purchase_account_name": ZOHO_ITEM_DEFAULTS.get("purchase_account_name", "Cost of Goods Sold"),
+            "item_type": ZOHO_ITEM_DEFAULTS["item_type"],
+            "product_type": ZOHO_ITEM_DEFAULTS["product_type"],
+            "is_taxable": ZOHO_ITEM_DEFAULTS["is_taxable"],
+            "unit": "pcs",
+            "_fee_type": fee_type,
+            "_source_product": product_name
+        }
+        
+        # Clean None values
+        payload = {k: v for k, v in payload.items() if v is not None}
+        fee_items.append(payload)
+    
+    # 2. Parse additional_charges_text
+    shipping = product.get("shipping", {})
+    additional_text = shipping.get("additional_charges_text", "")
+    if additional_text:
+        parsed_fees = parse_additional_charges_text(additional_text)
+        for fee in parsed_fees:
+            fee_type = sanitize_for_sku(fee.get("fee_type", "FEE"), 15)
+            
+            sku_parts = [client_num, "FEE", fee_type.upper(), base_code]
+            sku = "-".join(sku_parts)
+            
+            # Make SKU unique if name has detail
+            fee_name_clean = sanitize_for_sku(fee.get("name", ""), 20)
+            if fee_name_clean:
+                sku = f"{sku}-{fee_name_clean}"
+            
+            payload = {
+                "name": sku,
+                "sku": sku,
+                "description": fee.get("description", fee.get("name", "")),
+                "rate": fee.get("price"),
+                "purchase_rate": fee.get("price"),  # Assume same for now
+                "purchase_account_name": ZOHO_ITEM_DEFAULTS.get("purchase_account_name", "Cost of Goods Sold"),
+                "item_type": ZOHO_ITEM_DEFAULTS["item_type"],
+                "product_type": ZOHO_ITEM_DEFAULTS["product_type"],
+                "is_taxable": ZOHO_ITEM_DEFAULTS["is_taxable"],
+                "unit": "pcs",
+                "_fee_type": fee_type,
+                "_source_product": product_name,
+                "_parsed_from": "additional_charges_text"
+            }
+            
+            payload = {k: v for k, v in payload.items() if v is not None}
+            fee_items.append(payload)
+    
+    # 3. Check supplier_disclaimers for fee-related content
+    disclaimers = shipping.get("supplier_disclaimers", [])
+    for disclaimer in disclaimers:
+        # Look for surcharge mentions
+        if "surcharge" in disclaimer.lower() or "fee" in disclaimer.lower():
+            # Try to extract percentage
+            percent_match = re.search(r'(\d+(?:\.\d+)?)\s*%', disclaimer)
+            
+            sku = f"{client_num}-FEE-SURCHARGE-{base_code}"
+            
+            payload = {
+                "name": sku,
+                "sku": sku,
+                "description": disclaimer,
+                "rate": None,  # Percentage-based
+                "item_type": ZOHO_ITEM_DEFAULTS["item_type"],
+                "product_type": ZOHO_ITEM_DEFAULTS["product_type"],
+                "is_taxable": False,  # Surcharges typically not taxed
+                "unit": "pcs",
+                "_fee_type": "surcharge",
+                "_source_product": product_name,
+                "_parsed_from": "supplier_disclaimers"
+            }
+            
+            if percent_match:
+                payload["_percent"] = float(percent_match.group(1))
+            
+            payload = {k: v for k, v in payload.items() if v is not None}
+            fee_items.append(payload)
+    
+    logger.info(f"Built {len(fee_items)} fee items for product: {product_name}")
+    return fee_items
 
 
 # =============================================================================
@@ -332,28 +739,28 @@ def build_item_description(product: Dict[str, Any], inventory_note: Optional[str
 
 def build_item_payload(
     product: Dict[str, Any],
-    zoho_sku: str,
     client_account_number: str,
     discovered_fields: Dict[str, Optional[str]],
+    variation: Optional[Dict[str, str]] = None,
     category_id: Optional[str] = None,
     inventory_note: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Build the complete Zoho Item API payload.
     
-    Args:
-        product: Unified product dictionary
-        zoho_sku: Pre-built Zoho SKU ([ClientAcct]-[VendorSKU])
-        client_account_number: Client's account number (for reference)
-        discovered_fields: Dict of discovered custom field IDs
-        category_id: Optional Zoho category ID
-        inventory_note: Optional inventory check note
-        
-    Returns:
-        Complete item payload dictionary for Zoho API
+    Updated per Koell:
+    - SKU: <clientAcctId>-<baseCode> (no variation, no long name)
+    - Name: product title (clean, readable)
+    - Variations are NOT separate items by default; option lists go in description.
     """
     item = product.get("item", {})
     vendor = product.get("vendor", {})
+    
+    # Build simplified SKU
+    simplified_sku = build_item_name_sku(client_account_number, product, variation)
+    
+    # Product name (clean title)
+    product_name = item.get("name", "Unnamed Item")
     
     # Get pricing
     sell_price, net_cost = extract_base_pricing(product)
@@ -361,30 +768,50 @@ def build_item_payload(
     # Get MPN
     mpn = get_mpn(product)
     
-    # Build description with inventory note
-    description = build_item_description(product, inventory_note)
+    # Build description with inventory note and option lists
+    base_description = build_item_description(product, inventory_note)
+    
+    # Append available options (colors/sizes/deco) to description for quote usability
+    options_lines = []
+    colors = item.get("colors", [])
+    if colors:
+        options_lines.append(f"Available Colors: {', '.join(colors)}")
+    sizes = item.get("sizes", [])
+    if sizes:
+        options_lines.append(f"Available Sizes: {', '.join(sizes)}")
+    deco_methods = []
+    for method in product.get("decoration", {}).get("methods", []):
+        if isinstance(method, dict):
+            name = method.get("name")
+        else:
+            name = method
+        if name:
+            deco_methods.append(name)
+    deco_methods = list(dict.fromkeys(deco_methods))  # dedupe
+    if deco_methods:
+        options_lines.append(f"Decoration Methods: {', '.join(deco_methods)}")
+    
+    if options_lines:
+        base_description = "\n".join(options_lines) + "\n\n" + base_description
     
     # Start with required fields
     payload = {
-        "name": item.get("name", "Unnamed Item"),
-        "sku": zoho_sku,
-        "description": description,
+        "name": product_name,
+        "sku": simplified_sku,
+        "description": base_description,
         
         # Pricing - Sales Information
         "rate": sell_price,           # Selling price (what customer pays)
         
         # Purchase Information - Enabled by item_type="sales_and_purchases"
         "purchase_rate": net_cost,    # Cost price (what we pay to distributor)
-        "purchase_account_name": ZOHO_ITEM_DEFAULTS.get("purchase_account_name", "Cost of Goods Sold"),  # Purchase account
+        "purchase_account_name": ZOHO_ITEM_DEFAULTS.get("purchase_account_name", "Cost of Goods Sold"),
         
         # Item type settings from defaults
         "item_type": ZOHO_ITEM_DEFAULTS["item_type"],
         "product_type": ZOHO_ITEM_DEFAULTS["product_type"],
         "is_taxable": ZOHO_ITEM_DEFAULTS["is_taxable"],
         "unit": ZOHO_ITEM_DEFAULTS["unit"],
-        
-        # NOTE: Omitting track_inventory - when explicitly set to False,
-        # Zoho requires a category. By omitting it, Zoho uses its default.
     }
     
     # Add MPN as part_number (Zoho API field name)
@@ -410,6 +837,9 @@ def build_item_payload(
     if custom_fields:
         payload["custom_fields"] = custom_fields
     
+    # Metadata (optional, not sent)
+    payload["_original_name"] = product_name
+    
     # Clean up None values
     payload = {k: v for k, v in payload.items() if v is not None}
     
@@ -424,16 +854,24 @@ def prepare_products_for_zoho(
     unified_output: Dict[str, Any],
     client_account_number: str,
     discovered_fields: Dict[str, Optional[str]],
-    category_map: Optional[Dict[str, str]] = None
+    category_map: Optional[Dict[str, str]] = None,
+    include_variations: bool = False,
+    include_fees: bool = True
 ) -> List[Dict[str, Any]]:
     """
     Prepare all products from unified output for Zoho upload.
+    
+    Creates separate items for:
+    - Each product variation (color, size, decoration)
+    - Each fee associated with the product
     
     Args:
         unified_output: Complete unified output dictionary
         client_account_number: Client's Zoho account number
         discovered_fields: Dict of discovered custom field IDs
         category_map: Optional mapping of category names to Zoho category IDs
+        include_variations: Whether to explode variations (default True)
+        include_fees: Whether to include fee items (default True)
         
     Returns:
         List of Zoho item payloads ready for upload
@@ -443,14 +881,13 @@ def prepare_products_for_zoho(
     
     for product in products:
         try:
-            # Get vendor SKU
+            product_name = product.get("item", {}).get("name", "Unknown")
+            
+            # Get vendor SKU (for validation)
             vendor_sku = get_vendor_sku(product)
             if not vendor_sku:
-                logger.warning(f"Skipping product - no vendor SKU found: {product.get('item', {}).get('name', 'Unknown')}")
+                logger.warning(f"Skipping product - no vendor SKU found: {product_name}")
                 continue
-            
-            # Build Zoho SKU
-            zoho_sku = build_zoho_sku(client_account_number, vendor_sku)
             
             # Find category if mapping provided
             category_id = None
@@ -461,26 +898,51 @@ def prepare_products_for_zoho(
                         category_id = category_map[cat]
                         break
             
-            # Build payload
-            payload = build_item_payload(
-                product=product,
-                zoho_sku=zoho_sku,
-                client_account_number=client_account_number,
-                discovered_fields=discovered_fields,
-                category_id=category_id
-            )
+            # Explode variations or create single item
+            if include_variations:
+                variations = explode_product_variations(product)
+            else:
+                variations = [{}]  # Single base item (no variant explosion)
             
-            # Attach metadata for tracking
-            payload["_source_identifiers"] = product.get("identifiers", {})
-            payload["_source"] = product.get("source")
+            logger.info(f"Product '{product_name}': {len(variations)} variation(s)")
             
-            prepared_items.append(payload)
+            # Create item for each variation
+            for variation in variations:
+                payload = build_item_payload(
+                    product=product,
+                    client_account_number=client_account_number,
+                    discovered_fields=discovered_fields,
+                    variation=variation if variation else None,
+                    category_id=category_id
+                )
+                
+                # Attach metadata for tracking
+                payload["_source_identifiers"] = product.get("identifiers", {})
+                payload["_source"] = product.get("source")
+                payload["_is_variation"] = bool(variation)
+                
+                prepared_items.append(payload)
+            
+            # Build fee items
+            if include_fees:
+                fee_items = build_fee_items(
+                    product=product,
+                    client_account_number=client_account_number,
+                    discovered_fields=discovered_fields
+                )
+                prepared_items.extend(fee_items)
             
         except Exception as e:
             logger.error(f"Error preparing product: {e}")
+            import traceback
+            traceback.print_exc()
             continue
     
-    logger.info(f"Prepared {len(prepared_items)} items for Zoho upload")
+    # Summary
+    product_items = [p for p in prepared_items if not p.get("_fee_type")]
+    fee_items = [p for p in prepared_items if p.get("_fee_type")]
+    
+    logger.info(f"Prepared {len(product_items)} product items + {len(fee_items)} fee items = {len(prepared_items)} total")
     return prepared_items
 
 
