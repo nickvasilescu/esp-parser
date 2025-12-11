@@ -56,6 +56,18 @@ ZOHO_ITEM_DEFAULTS = {
 
 
 # =============================================================================
+# Quote/Estimate Defaults
+# =============================================================================
+
+# Default settings for Zoho Estimates (Quotes)
+ZOHO_QUOTE_DEFAULTS = {
+    "expiry_days": int(os.getenv("ZOHO_QUOTE_EXPIRY_DAYS", "30")),  # Quote expires in 30 days
+    "default_shipping_percent": float(os.getenv("ZOHO_QUOTE_SHIPPING_PERCENT", "0.15")),  # 15% shipping estimate
+    "status": "draft",  # Always create as draft (not sent)
+}
+
+
+# =============================================================================
 # Custom Field Pattern Matching
 # =============================================================================
 

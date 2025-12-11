@@ -40,10 +40,17 @@ from output_normalizer import normalize_output, detect_source
 
 # Zoho integration (optional - only import if needed)
 ZOHO_AVAILABLE = False
+ZOHO_QUOTE_AVAILABLE = False
 try:
     from zoho_item_agent import ZohoItemMasterAgent, AgentResult
     from zoho_config import validate_zoho_config
     ZOHO_AVAILABLE = True
+except ImportError:
+    pass
+
+try:
+    from zoho_quote_agent import ZohoQuoteAgent, QuoteResult
+    ZOHO_QUOTE_AVAILABLE = True
 except ImportError:
     pass
 
@@ -776,11 +783,12 @@ class Orchestrator:
         skip_cua: bool = False,
         limit_products: Optional[int] = None,
         zoho_upload: bool = False,
-        zoho_dry_run: bool = False
+        zoho_dry_run: bool = False,
+        zoho_quote: bool = False
     ):
         """
         Initialize the orchestrator.
-        
+
         Args:
             url: Presentation URL (SAGE or ESP)
             computer_id: Optional Orgo computer ID for ESP pipeline
@@ -790,6 +798,7 @@ class Orchestrator:
             limit_products: If set, only process this many products (useful for testing)
             zoho_upload: If True, upload items to Zoho Item Master after normalization
             zoho_dry_run: If True, validate Zoho upload but don't actually upload
+            zoho_quote: If True, create draft quote in Zoho Books after Item Master upload
         """
         self.url = url
         self.computer_id = computer_id
@@ -798,6 +807,7 @@ class Orchestrator:
         self.limit_products = limit_products
         self.zoho_upload = zoho_upload
         self.zoho_dry_run = zoho_dry_run
+        self.zoho_quote = zoho_quote
         
         # Generate or use provided job ID
         self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -932,7 +942,69 @@ class Orchestrator:
                         "success": False,
                         "error": str(e)
                     }
-        
+
+        # =========================================================================
+        # Optional: Zoho Quote Creation
+        # =========================================================================
+        quote_result = None
+        if self.zoho_quote:
+            logger.info("=" * 60)
+            logger.info("ZOHO QUOTE CREATION")
+            logger.info("=" * 60)
+
+            if not ZOHO_QUOTE_AVAILABLE:
+                logger.error("Zoho Quote Agent not available. Install zoho_quote_agent module.")
+            else:
+                try:
+                    # Validate Zoho configuration
+                    validate_zoho_config()
+
+                    # Build item_master_map from previous upload results
+                    item_master_map = {}
+                    if zoho_result and hasattr(zoho_result, 'items'):
+                        for item in zoho_result.items:
+                            if item.zoho_sku and item.item_id:
+                                item_master_map[item.zoho_sku] = item.item_id
+                        logger.info(f"Item Master map: {len(item_master_map)} entries for linking")
+
+                    # Create and run quote agent
+                    quote_agent = ZohoQuoteAgent()
+                    quote_result = quote_agent.create_quote(
+                        unified_output=normalized_result,
+                        item_master_map=item_master_map,
+                        dry_run=self.zoho_dry_run
+                    )
+
+                    # Add Quote result to normalized output
+                    normalized_result["zoho_quote_result"] = {
+                        "success": quote_result.success,
+                        "estimate_id": quote_result.estimate_id,
+                        "estimate_number": quote_result.estimate_number,
+                        "customer_id": quote_result.customer_id,
+                        "customer_name": quote_result.customer_name,
+                        "total_amount": quote_result.total_amount,
+                        "line_items_count": quote_result.line_items_count,
+                        "duration_seconds": quote_result.duration_seconds,
+                        "error": quote_result.error
+                    }
+
+                    # Save updated output with Quote results
+                    with open(output_path, "w", encoding="utf-8") as f:
+                        json.dump(normalized_result, f, indent=2, ensure_ascii=False)
+
+                    if quote_result.success:
+                        total_str = f"${quote_result.total_amount:.2f}" if quote_result.total_amount else "N/A"
+                        logger.info(f"Quote created: {quote_result.estimate_number} ({total_str})")
+                    else:
+                        logger.error(f"Quote creation failed: {quote_result.error}")
+
+                except Exception as e:
+                    logger.error(f"Zoho quote creation failed: {e}")
+                    normalized_result["zoho_quote_result"] = {
+                        "success": False,
+                        "error": str(e)
+                    }
+
         # Summary
         logger.info("=" * 60)
         logger.info("ORCHESTRATION COMPLETE")
@@ -944,7 +1016,13 @@ class Orchestrator:
         logger.info(f"Unified schema: YES - ready for Zoho/Calculator")
         if zoho_result:
             logger.info(f"Zoho Upload: {zoho_result.successful_uploads}/{zoho_result.total_products} items uploaded")
-        
+        if quote_result:
+            if quote_result.success:
+                total_str = f"${quote_result.total_amount:.2f}" if quote_result.total_amount else "N/A"
+                logger.info(f"Zoho Quote: {quote_result.estimate_number} - {total_str} ({quote_result.line_items_count} line items)")
+            else:
+                logger.info(f"Zoho Quote: FAILED - {quote_result.error}")
+
         return normalized_result  # Return unified format for downstream workflows
 
 
@@ -982,6 +1060,12 @@ Examples:
   
   # Full workflow: skip CUA, upload to Zoho
   %(prog)s <url> --skip-cua --zoho-upload
+
+  # Create draft quote in Zoho Books (implies --zoho-upload)
+  %(prog)s <url> --zoho-quote
+
+  # Full workflow: skip CUA, upload to Zoho, create quote
+  %(prog)s <url> --skip-cua --zoho-upload --zoho-quote
 
 Supported URL Patterns:
   SAGE:  viewpresentation.com/*
@@ -1068,7 +1152,13 @@ Environment Variables:
         action="store_true",
         help="Validate Zoho upload without actually uploading (implies --zoho-upload)"
     )
-    
+
+    parser.add_argument(
+        "--zoho-quote",
+        action="store_true",
+        help="Create draft quote in Zoho Books after Item Master upload"
+    )
+
     args = parser.parse_args()
     
     # Set logging level
@@ -1077,7 +1167,11 @@ Environment Variables:
     
     # Handle Zoho flags
     zoho_upload = args.zoho_upload or args.zoho_dry_run
-    
+    # If quote is requested, automatically enable upload (need Item Master entries)
+    if args.zoho_quote and not zoho_upload:
+        zoho_upload = True
+        logger.info("--zoho-quote implies --zoho-upload (Item Master entries needed for linking)")
+
     # Create and run orchestrator
     orchestrator = Orchestrator(
         url=args.url,
@@ -1087,7 +1181,8 @@ Environment Variables:
         skip_cua=args.skip_cua,
         limit_products=args.limit_products,
         zoho_upload=zoho_upload,
-        zoho_dry_run=args.zoho_dry_run
+        zoho_dry_run=args.zoho_dry_run,
+        zoho_quote=args.zoho_quote
     )
     
     try:

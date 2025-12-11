@@ -953,32 +953,628 @@ def prepare_products_for_zoho(
 def validate_item_payload(payload: Dict[str, Any]) -> List[str]:
     """
     Validate an item payload before upload.
-    
+
     Args:
         payload: Item payload dictionary
-        
+
     Returns:
         List of validation errors (empty if valid)
     """
     errors = []
-    
+
     # Required fields
     if not payload.get("name"):
         errors.append("Missing required field: name")
     if not payload.get("sku"):
         errors.append("Missing required field: sku")
-    
+
     # SKU format validation
     sku = payload.get("sku", "")
     if "-" not in sku:
         errors.append(f"SKU format invalid (expected [ClientAcct]-[VendorSKU]): {sku}")
-    
+
     # Price validation (warn, don't fail)
     if payload.get("rate") is None:
         logger.warning(f"Item {sku} has no sell price (rate)")
     if payload.get("purchase_rate") is None:
         logger.warning(f"Item {sku} has no cost price (purchase_rate)")
-    
+
+    return errors
+
+
+# =============================================================================
+# Quote/Estimate Payload Builders
+# =============================================================================
+
+# Default descriptions for fee types when none is provided
+FEE_TYPE_DESCRIPTIONS = {
+    "setup": "One-time setup charge for production preparation",
+    "proof": "Pre-production proof for customer approval before manufacturing",
+    "pms": "PMS (Pantone) color match fee for custom color matching",
+    "pms_match": "PMS (Pantone) color match fee for custom color matching",
+    "additional_color": "Additional color charge per color beyond base decoration",
+    "additional_color_run": "Per-piece run charge for additional colors",
+    "additional_color_setup": "Setup charge for additional color in decoration",
+    "copy_change": "Charge for artwork or copy modifications after initial setup",
+    "imprint": "Imprint/decoration charge for logo or design application",
+    "personalization": "Personalization charge for individual customization (names, numbers, etc.)",
+    "decoration": "Decoration charge for product customization",
+    "rush": "Rush/expedited production fee for faster turnaround",
+    "handling": "Special handling or packaging charge",
+    "artwork": "Artwork creation or modification fee",
+    "tape": "Tape/color change charge for multi-color decoration",
+    "flash": "Flash charge for specialty ink curing between colors",
+    "screen": "Screen charge for screen printing setup",
+    "digitizing": "Digitizing fee for converting artwork to embroidery format",
+    "embroidery": "Embroidery decoration charge",
+    "laser": "Laser engraving decoration charge",
+    "deboss": "Debossing decoration charge (pressed-in design)",
+    "emboss": "Embossing decoration charge (raised design)",
+    "pad_print": "Pad printing decoration charge",
+    "screen_print": "Screen printing decoration charge",
+    "heat_transfer": "Heat transfer decoration charge",
+    "full_color": "Full color/4-color process decoration charge",
+    "uv_print": "UV printing decoration charge",
+}
+
+
+def get_fee_description(fee: Dict[str, Any]) -> str:
+    """
+    Get a meaningful description for a fee.
+
+    Uses the fee's own description if available, otherwise generates
+    a default based on fee_type or name.
+
+    Args:
+        fee: Fee dictionary with fee_type, name, description fields
+
+    Returns:
+        Meaningful description string (never empty)
+    """
+    # First try the fee's own description
+    description = fee.get("description", "")
+    if description and description.strip() and description.lower() != "null":
+        return description.strip()
+
+    # Try to get default based on fee_type
+    fee_type = fee.get("fee_type", "").lower().strip()
+    if fee_type and fee_type in FEE_TYPE_DESCRIPTIONS:
+        return FEE_TYPE_DESCRIPTIONS[fee_type]
+
+    # Try to infer from fee name
+    name = fee.get("name", "").lower()
+
+    # Check for common keywords in name
+    keyword_mappings = [
+        (["setup"], "setup"),
+        (["proof"], "proof"),
+        (["pms", "pantone", "color match"], "pms"),
+        (["additional color", "extra color"], "additional_color"),
+        (["copy change", "artwork change"], "copy_change"),
+        (["personalization", "personalize"], "personalization"),
+        (["rush", "expedite"], "rush"),
+        (["digitiz"], "digitizing"),
+        (["embroid"], "embroidery"),
+        (["laser", "engrav"], "laser"),
+        (["deboss"], "deboss"),
+        (["emboss"], "emboss"),
+        (["pad print"], "pad_print"),
+        (["screen print"], "screen_print"),
+        (["heat transfer"], "heat_transfer"),
+        (["full color", "4-color", "4 color", "cmyk"], "full_color"),
+        (["uv print"], "uv_print"),
+        (["tape"], "tape"),
+        (["flash"], "flash"),
+        (["screen"], "screen"),
+        (["imprint"], "imprint"),
+    ]
+
+    for keywords, fee_type_key in keyword_mappings:
+        if any(kw in name for kw in keywords):
+            return FEE_TYPE_DESCRIPTIONS.get(fee_type_key, f"Fee for {fee.get('name', 'service')}")
+
+    # Last resort - generate from name
+    original_name = fee.get("name", "")
+    if original_name:
+        return f"Charge for {original_name.lower()}"
+
+    return "Additional service charge"
+
+
+def build_estimate_line_item(
+    name: str,
+    description: str,
+    rate: float,
+    quantity: int = 1,
+    item_id: Optional[str] = None,
+    unit: str = "pcs"
+) -> Dict[str, Any]:
+    """
+    Build a single line item for a Zoho estimate.
+
+    Args:
+        name: Line item name (displayed on quote)
+        description: Line item description
+        rate: Unit price
+        quantity: Quantity
+        item_id: Optional Zoho item_id (links to Item Master)
+        unit: Unit of measure
+
+    Returns:
+        Line item dictionary for estimate API
+    """
+    line_item = {
+        "name": name,
+        "description": description,
+        "rate": rate,
+        "quantity": quantity,
+        "unit": unit
+    }
+
+    if item_id:
+        line_item["item_id"] = item_id
+
+    return line_item
+
+
+def build_product_tier_line_items(
+    product: Dict[str, Any],
+    item_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Build line items for EACH quantity tier of a product.
+
+    Creates multiple line items showing price at each quantity break.
+    The sell_price ALWAYS comes from presentation data.
+
+    Args:
+        product: Unified product dictionary
+        item_id: Optional Zoho item_id from Item Master
+
+    Returns:
+        List of line items, one per quantity tier
+    """
+    item = product.get("item", {})
+    pricing = product.get("pricing", {})
+    breaks = pricing.get("breaks", [])
+
+    product_name = item.get("name", "Product")
+    base_code = get_vendor_sku(product) or "ITEM"
+
+    line_items = []
+
+    # Sort breaks by quantity ascending
+    sorted_breaks = sorted(breaks, key=lambda b: b.get("quantity", 0))
+
+    for brk in sorted_breaks:
+        qty = brk.get("quantity", 0)
+        sell_price = brk.get("sell_price")  # ALWAYS from presentation
+
+        if sell_price is None:
+            # Skip tiers without sell_price
+            logger.debug(f"Skipping tier qty={qty} - no sell_price")
+            continue
+
+        if qty <= 0:
+            continue
+
+        line_items.append(build_estimate_line_item(
+            name=f"{product_name} ({base_code}) - Qty {qty}+",
+            description=f"Unit price at {qty}+ quantity tier",
+            rate=sell_price,
+            quantity=qty,
+            item_id=item_id,
+            unit="pcs"
+        ))
+
+    logger.info(f"Built {len(line_items)} quantity tier line items for {product_name}")
+    return line_items
+
+
+def build_setup_fee_line_item(
+    product: Dict[str, Any],
+    item_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Build setup fee line item if exists.
+
+    Checks structured fees[] first, then parses additional_charges_text.
+
+    Args:
+        product: Unified product dictionary
+        item_id: Optional Zoho item_id for setup fee item
+
+    Returns:
+        Setup fee line item or None if no setup fee
+    """
+    fees = product.get("fees", [])
+
+    # Check structured fees first
+    for fee in fees:
+        if fee.get("fee_type", "").lower() == "setup":
+            rate = fee.get("list_price")
+            if rate:
+                return build_estimate_line_item(
+                    name="Setup Charge",
+                    description=get_fee_description(fee),
+                    rate=rate,
+                    quantity=1,
+                    item_id=item_id,
+                    unit="ea"
+                )
+
+    # Check additional_charges_text for setup
+    shipping = product.get("shipping", {})
+    additional_text = shipping.get("additional_charges_text", "")
+    if additional_text:
+        parsed = parse_additional_charges_text(additional_text)
+        for fee in parsed:
+            if fee.get("fee_type") == "setup" and fee.get("price"):
+                return build_estimate_line_item(
+                    name="Setup Charge",
+                    description=get_fee_description(fee),
+                    rate=fee["price"],
+                    quantity=1,
+                    item_id=item_id,
+                    unit="ea"
+                )
+
+    return None
+
+
+def build_decoration_line_items(
+    product: Dict[str, Any],
+    item_ids: Optional[Dict[str, str]] = None
+) -> List[Dict[str, Any]]:
+    """
+    Build decoration line items using FAN-OUT approach.
+
+    Creates separate line items for ALL decoration options/methods
+    so the user can delete unwanted ones manually.
+
+    Args:
+        product: Unified product dictionary
+        item_ids: Optional map of fee_type -> item_id
+
+    Returns:
+        List of decoration-related line items
+    """
+    line_items = []
+    decoration = product.get("decoration", {})
+    fees = product.get("fees", [])
+
+    # 1. Decoration-specific fees (additional color, PMS match, imprint, etc.)
+    deco_fee_types = {"decoration", "imprint", "personalization",
+                      "additional_color", "pms", "pms_match", "proof",
+                      "copy_change", "additional_color_run", "additional_color_setup"}
+
+    for fee in fees:
+        fee_type = fee.get("fee_type", "").lower()
+        if fee_type in deco_fee_types or "color" in fee_type or "imprint" in fee_type:
+            rate = fee.get("list_price") or 0
+            deco_method = fee.get("decoration_method", "")
+            name = fee.get("name", "Decoration Charge")
+            if deco_method and deco_method.lower() not in name.lower():
+                name = f"{name} ({deco_method})"
+
+            line_items.append(build_estimate_line_item(
+                name=name,
+                description=get_fee_description(fee),
+                rate=rate,
+                quantity=1,
+                item_id=item_ids.get(fee_type) if item_ids else None,
+                unit="ea"
+            ))
+
+    # 2. Parse decoration fees from additional_charges_text
+    shipping = product.get("shipping", {})
+    additional_text = shipping.get("additional_charges_text", "")
+    if additional_text:
+        parsed = parse_additional_charges_text(additional_text)
+        for fee in parsed:
+            fee_type = fee.get("fee_type", "")
+            # Skip setup (handled separately) and rush (not decoration)
+            if fee_type in ("setup", "rush"):
+                continue
+            if fee_type in deco_fee_types or fee_type in ("addon", "imprint", "personalization"):
+                rate = fee.get("price") or 0
+                line_items.append(build_estimate_line_item(
+                    name=fee.get("name", "Decoration Fee"),
+                    description=get_fee_description(fee),
+                    rate=rate,
+                    quantity=1,
+                    unit="ea"
+                ))
+
+    # 3. Fan-out decoration METHODS as options (even if same base price)
+    methods = decoration.get("methods", [])
+    for method in methods:
+        if isinstance(method, dict):
+            method_name = method.get("name", "")
+            method_notes = method.get("notes", "")
+        else:
+            method_name = str(method)
+            method_notes = ""
+
+        if not method_name:
+            continue
+
+        # Check if we already have a fee line for this method
+        method_exists = any(
+            method_name.lower() in li.get("name", "").lower()
+            for li in line_items
+        )
+
+        if not method_exists:
+            # Add as option line (price TBD or $0 placeholder)
+            line_items.append(build_estimate_line_item(
+                name=f"Decoration Option: {method_name}",
+                description=method_notes or f"{method_name} decoration method - price TBD",
+                rate=0.00,  # Price TBD - user fills in
+                quantity=1,
+                unit="ea"
+            ))
+
+    logger.info(f"Built {len(line_items)} decoration line items (fan-out approach)")
+    return line_items
+
+
+def get_explicit_shipping_cost(product: Dict[str, Any]) -> Optional[Tuple[float, str]]:
+    """
+    Check if a product has an explicit quoted shipping cost.
+
+    Args:
+        product: Unified product dictionary
+
+    Returns:
+        Tuple of (amount, description) if explicit shipping exists, None otherwise
+    """
+    fees = product.get("fees", [])
+
+    for fee in fees:
+        if fee.get("fee_type", "").lower() in ("shipping", "freight"):
+            quoted = fee.get("list_price")
+            if quoted:
+                product_name = product.get("item", {}).get("name", "Product")
+                return quoted, f"Quoted shipping for {product_name}"
+
+    return None
+
+
+def calculate_shipping_estimate(
+    product_subtotal: float,
+    product: Dict[str, Any],
+    default_percentage: float = 0.15
+) -> Tuple[float, str]:
+    """
+    Calculate shipping cost.
+
+    Uses quoted shipping if available, otherwise estimates at 15%.
+
+    Args:
+        product_subtotal: Total product cost (for percentage calculation)
+        product: Unified product dictionary
+        default_percentage: Default shipping percentage (0.15 = 15%)
+
+    Returns:
+        Tuple of (amount, description)
+    """
+    # Check for explicit quoted shipping
+    explicit = get_explicit_shipping_cost(product)
+    if explicit:
+        return explicit
+
+    # Default to percentage estimate
+    estimated = round(product_subtotal * default_percentage, 2)
+    return estimated, f"Estimated shipping ({int(default_percentage * 100)}% of product cost)"
+
+
+def build_shipping_line_item(
+    product_subtotal: float,
+    product: Dict[str, Any],
+    item_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Build shipping line item.
+
+    Args:
+        product_subtotal: Total product cost for percentage estimate
+        product: Unified product dictionary
+        item_id: Optional Zoho item_id for shipping item
+
+    Returns:
+        Shipping line item dictionary
+    """
+    shipping = product.get("shipping", {})
+
+    amount, description = calculate_shipping_estimate(product_subtotal, product)
+
+    # Add lead time to description if available
+    lead_time = shipping.get("lead_time")
+    if lead_time:
+        description += f"\nLead Time: {lead_time}"
+
+    return build_estimate_line_item(
+        name="Shipping & Handling",
+        description=description,
+        rate=amount,
+        quantity=1,
+        item_id=item_id,
+        unit="ea"
+    )
+
+
+def build_estimate_payload(
+    unified_output: Dict[str, Any],
+    customer_id: str,
+    item_master_map: Optional[Dict[str, str]] = None,
+    expiry_days: int = 30
+) -> Dict[str, Any]:
+    """
+    Build complete Zoho estimate payload from unified output.
+
+    Creates a quote with multiple line items per product:
+    - One line per quantity tier (with sell_price from presentation)
+    - Setup fee (if exists)
+    - Decoration options (fan-out approach)
+    - Single consolidated shipping estimate (15% of total) OR explicit quoted shipping
+
+    Shipping Logic:
+    - Products with explicit quoted shipping get individual shipping line items
+    - All other products are covered by a single "Estimated Shipping" at 15% of total
+
+    Args:
+        unified_output: Normalized unified schema data
+        customer_id: Zoho customer ID (found via STBL-XXXXX search)
+        item_master_map: Optional map of SKUs to Item Master item_ids
+        expiry_days: Days until quote expires (default 30)
+
+    Returns:
+        Complete estimate payload for Zoho API
+    """
+    from datetime import datetime, timedelta
+    from zoho_config import ZOHO_QUOTE_DEFAULTS
+
+    products = unified_output.get("products", [])
+    metadata = unified_output.get("metadata", {})
+
+    if item_master_map is None:
+        item_master_map = {}
+
+    all_line_items = []
+    total_product_subtotal = 0.0  # For 15% shipping estimate
+    explicit_shipping_lines = []  # Products with quoted shipping
+
+    for product in products:
+        product_name = product.get("item", {}).get("name", "Unknown Product")
+        base_code = get_vendor_sku(product) or "UNKNOWN"
+
+        logger.info(f"Building estimate lines for product: {product_name} ({base_code})")
+
+        # Find item_id from Item Master (if exists)
+        # SKU format: <client_num>-<base_code>
+        item_id = None
+        for sku, iid in item_master_map.items():
+            if base_code in sku:
+                item_id = iid
+                logger.debug(f"Found Item Master link: {sku} -> {iid}")
+                break
+
+        # 1. Product line items (one per quantity tier)
+        tier_lines = build_product_tier_line_items(product, item_id)
+        all_line_items.extend(tier_lines)
+
+        # Calculate subtotal from first tier for shipping estimate
+        product_subtotal = 0.0
+        if tier_lines:
+            first_tier = tier_lines[0]
+            product_subtotal = first_tier["rate"] * first_tier["quantity"]
+
+        # 2. Setup fee (if exists)
+        setup_line = build_setup_fee_line_item(product)
+        if setup_line:
+            all_line_items.append(setup_line)
+
+        # 3. Decoration options (fan-out approach)
+        deco_lines = build_decoration_line_items(product)
+        all_line_items.extend(deco_lines)
+
+        # 4. Check for explicit quoted shipping
+        explicit_shipping = get_explicit_shipping_cost(product)
+        if explicit_shipping:
+            # Product has explicit shipping - add as separate line item
+            amount, description = explicit_shipping
+            explicit_shipping_lines.append(build_estimate_line_item(
+                name=f"Shipping: {product_name[:40]}",
+                description=description,
+                rate=amount,
+                quantity=1,
+                unit="ea"
+            ))
+            logger.info(f"Product '{product_name}' has explicit shipping: ${amount}")
+        else:
+            # No explicit shipping - add to total for 15% estimate
+            total_product_subtotal += product_subtotal
+
+    # Add explicit shipping line items (for products with quoted shipping)
+    if explicit_shipping_lines:
+        all_line_items.extend(explicit_shipping_lines)
+        logger.info(f"Added {len(explicit_shipping_lines)} explicit shipping line items")
+
+    # Add single estimated shipping line item (15% of products without quoted shipping)
+    if total_product_subtotal > 0:
+        shipping_percent = ZOHO_QUOTE_DEFAULTS.get("default_shipping_percent", 0.15)
+        estimated_shipping = round(total_product_subtotal * shipping_percent, 2)
+        all_line_items.append(build_estimate_line_item(
+            name="Estimated Shipping & Handling",
+            description=f"Estimated at {int(shipping_percent * 100)}% of product subtotal (${total_product_subtotal:,.2f})",
+            rate=estimated_shipping,
+            quantity=1,
+            unit="ea"
+        ))
+        logger.info(f"Added estimated shipping: ${estimated_shipping} ({int(shipping_percent * 100)}% of ${total_product_subtotal:,.2f})")
+
+    # Build dates
+    today = datetime.now()
+    estimate_date = today.strftime("%Y-%m-%d")
+    expiry_date = (today + timedelta(days=expiry_days)).strftime("%Y-%m-%d")
+
+    # Auto-generate notes from presentation metadata
+    pres_title = metadata.get("presentation_title", "")
+    pres_url = metadata.get("presentation_url", metadata.get("source_url", ""))
+    source = metadata.get("source", "")
+
+    notes_parts = []
+    if pres_title:
+        notes_parts.append(f"Quote based on presentation: {pres_title}")
+    if pres_url:
+        notes_parts.append(f"Source: {pres_url}")
+    if source:
+        notes_parts.append(f"Platform: {source.upper()}")
+
+    notes = "\n".join(notes_parts) if notes_parts else "Quote generated from presentation data"
+
+    logger.info(f"Built estimate with {len(all_line_items)} total line items")
+
+    return {
+        "customer_id": customer_id,
+        "date": estimate_date,
+        "expiry_date": expiry_date,
+        "line_items": all_line_items,
+        "notes": notes,
+        "status": "draft"
+    }
+
+
+def validate_estimate_payload(payload: Dict[str, Any]) -> List[str]:
+    """
+    Validate an estimate payload before creation.
+
+    Args:
+        payload: Estimate payload dictionary
+
+    Returns:
+        List of validation errors (empty if valid)
+    """
+    errors = []
+
+    # Required fields
+    if not payload.get("customer_id"):
+        errors.append("Missing required field: customer_id")
+
+    line_items = payload.get("line_items", [])
+    if not line_items:
+        errors.append("Estimate must have at least one line item")
+
+    # Validate line items
+    for i, item in enumerate(line_items):
+        if not item.get("name"):
+            errors.append(f"Line item {i+1}: missing name")
+        if item.get("rate") is None:
+            errors.append(f"Line item {i+1}: missing rate")
+        if item.get("quantity") is None or item.get("quantity", 0) <= 0:
+            errors.append(f"Line item {i+1}: invalid quantity")
+
     return errors
 
 

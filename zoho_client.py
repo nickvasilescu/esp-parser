@@ -536,16 +536,178 @@ class ZohoClient:
     def get_contact_by_id(self, contact_id: str) -> Dict[str, Any]:
         """
         Get a single contact by ID.
-        
+
         Args:
             contact_id: Zoho contact ID
-            
+
         Returns:
             Contact data
         """
         response = self._make_request("GET", f"/contacts/{contact_id}")
         return response.get("contact", {})
-    
+
+    def find_customer_by_account_number(self, account_number: str) -> Optional[Dict[str, Any]]:
+        """
+        Find a customer by their account number (contact_number field).
+
+        Searches for contacts with contact_number matching the provided account number.
+        Supports both raw account number (e.g., "10040") and prefixed format (e.g., "STBL-10040").
+
+        Args:
+            account_number: Account number to search for (with or without STBL- prefix)
+
+        Returns:
+            Customer contact if found, None otherwise
+        """
+        # Normalize: ensure STBL- prefix
+        if not account_number.upper().startswith("STBL-"):
+            search_term = f"STBL-{account_number}"
+        else:
+            search_term = account_number.upper()
+
+        logger.debug(f"Searching for customer with account number: {search_term}")
+
+        # Search contacts by the account number
+        contacts = self.get_contacts(search_text=search_term, contact_type="customer")
+
+        for contact in contacts:
+            contact_number = contact.get("contact_number", "")
+            if contact_number.upper() == search_term:
+                logger.info(f"Found customer: {contact.get('contact_name')} (ID: {contact.get('contact_id')})")
+                return contact
+
+        # Also try without prefix in case it's stored differently
+        raw_number = account_number.replace("STBL-", "").replace("stbl-", "")
+        for contact in contacts:
+            contact_number = contact.get("contact_number", "")
+            if contact_number == raw_number:
+                logger.info(f"Found customer by raw number: {contact.get('contact_name')} (ID: {contact.get('contact_id')})")
+                return contact
+
+        logger.warning(f"No customer found with account number: {search_term}")
+        return None
+
+    # =========================================================================
+    # Estimates (Quotes) API
+    # =========================================================================
+
+    def create_estimate(self, estimate_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a new estimate (quote) in Zoho Books.
+
+        Estimates are created as draft by default and can be sent to customers
+        or converted to sales orders/invoices.
+
+        Args:
+            estimate_data: Estimate payload including:
+                - customer_id (required): Zoho customer ID
+                - date: Estimate date (YYYY-MM-DD)
+                - expiry_date: Quote expiry date
+                - line_items: List of line item dicts
+                - notes: Customer notes
+                - terms: Terms and conditions
+                - status: "draft" or "sent"
+
+        Returns:
+            Created estimate data including estimate_id, estimate_number
+        """
+        response = self._make_request("POST", "/estimates", json_data=estimate_data)
+        return response.get("estimate", {})
+
+    def get_estimate(self, estimate_id: str) -> Dict[str, Any]:
+        """
+        Get a single estimate by ID.
+
+        Args:
+            estimate_id: Zoho estimate ID
+
+        Returns:
+            Estimate data
+        """
+        response = self._make_request("GET", f"/estimates/{estimate_id}")
+        return response.get("estimate", {})
+
+    def get_estimates(
+        self,
+        customer_id: Optional[str] = None,
+        status: Optional[str] = None,
+        search_text: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 200
+    ) -> List[Dict[str, Any]]:
+        """
+        Get estimates with optional filters.
+
+        Args:
+            customer_id: Filter by customer ID
+            status: Filter by status (draft, sent, accepted, declined, invoiced)
+            search_text: Search text
+            page: Page number
+            per_page: Estimates per page (max 200)
+
+        Returns:
+            List of estimates
+        """
+        params = {
+            "page": page,
+            "per_page": per_page
+        }
+
+        if customer_id:
+            params["customer_id"] = customer_id
+        if status:
+            params["status"] = status
+        if search_text:
+            params["search_text"] = search_text
+
+        response = self._make_request("GET", "/estimates", params=params)
+        return response.get("estimates", [])
+
+    def update_estimate(self, estimate_id: str, estimate_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update an existing estimate.
+
+        Args:
+            estimate_id: Zoho estimate ID
+            estimate_data: Updated estimate data
+
+        Returns:
+            Updated estimate data
+        """
+        response = self._make_request("PUT", f"/estimates/{estimate_id}", json_data=estimate_data)
+        return response.get("estimate", {})
+
+    def mark_estimate_as_sent(self, estimate_id: str) -> Dict[str, Any]:
+        """
+        Mark an estimate as sent.
+
+        Use this when the estimate was sent to the customer through other means
+        (not via Zoho's email).
+
+        Args:
+            estimate_id: Zoho estimate ID
+
+        Returns:
+            Response data
+        """
+        response = self._make_request("POST", f"/estimates/{estimate_id}/status/sent")
+        return response
+
+    def mark_estimate_as_accepted(self, estimate_id: str) -> Dict[str, Any]:
+        """
+        Mark an estimate as accepted.
+
+        Use this when the customer has accepted the quote through other means.
+
+        Args:
+            estimate_id: Zoho estimate ID
+
+        Returns:
+            Response data
+        """
+        response = self._make_request("POST", f"/estimates/{estimate_id}/status/accepted")
+        return response
+
     # =========================================================================
     # Custom Fields API
     # =========================================================================
