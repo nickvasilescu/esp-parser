@@ -54,6 +54,14 @@ try:
 except ImportError:
     pass
 
+# Calculator Generator (optional - for client-facing Excel calculators)
+CALCULATOR_AVAILABLE = False
+try:
+    from calculator_generator import CalculatorGeneratorAgent, CalculatorResult
+    CALCULATOR_AVAILABLE = True
+except ImportError:
+    pass
+
 
 # Set up logging
 logging.basicConfig(
@@ -784,7 +792,9 @@ class Orchestrator:
         limit_products: Optional[int] = None,
         zoho_upload: bool = False,
         zoho_dry_run: bool = False,
-        zoho_quote: bool = False
+        zoho_quote: bool = False,
+        calculator: bool = False,
+        output_dir: str = OUTPUT_DIR
     ):
         """
         Initialize the orchestrator.
@@ -799,6 +809,8 @@ class Orchestrator:
             zoho_upload: If True, upload items to Zoho Item Master after normalization
             zoho_dry_run: If True, validate Zoho upload but don't actually upload
             zoho_quote: If True, create draft quote in Zoho Books after Item Master upload
+            calculator: If True, generate client calculator Excel and upload to Zoho WorkDrive
+            output_dir: Directory for output files
         """
         self.url = url
         self.computer_id = computer_id
@@ -808,6 +820,8 @@ class Orchestrator:
         self.zoho_upload = zoho_upload
         self.zoho_dry_run = zoho_dry_run
         self.zoho_quote = zoho_quote
+        self.calculator = calculator
+        self.output_dir = output_dir
         
         # Generate or use provided job ID
         self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -1005,6 +1019,60 @@ class Orchestrator:
                         "error": str(e)
                     }
 
+        # =========================================================================
+        # Optional: Calculator Generation
+        # =========================================================================
+        calc_result = None
+        if self.calculator:
+            logger.info("=" * 60)
+            logger.info("CALCULATOR GENERATION")
+            logger.info("=" * 60)
+
+            if not CALCULATOR_AVAILABLE:
+                logger.error("Calculator Generator not available. Install calculator_generator module.")
+            else:
+                try:
+                    # Import zoho_client for WorkDrive upload
+                    from zoho_client import ZohoClient
+                    zoho_client = ZohoClient()
+
+                    calc_agent = CalculatorGeneratorAgent(zoho_client=zoho_client)
+                    calc_result = calc_agent.generate_calculator(
+                        unified_output=normalized_result,
+                        output_dir=self.output_dir,
+                        dry_run=self.zoho_dry_run
+                    )
+
+                    # Add Calculator result to normalized output
+                    normalized_result["calculator_result"] = {
+                        "success": calc_result.success,
+                        "file_name": calc_result.file_name,
+                        "file_path": calc_result.file_path,
+                        "drive_file_id": calc_result.drive_file_id,
+                        "drive_permalink": calc_result.drive_permalink,
+                        "products_count": calc_result.products_count,
+                        "duration_seconds": calc_result.duration_seconds,
+                        "error": calc_result.error
+                    }
+
+                    # Save updated output with Calculator results
+                    with open(output_path, "w", encoding="utf-8") as f:
+                        json.dump(normalized_result, f, indent=2, ensure_ascii=False)
+
+                    if calc_result.success:
+                        logger.info(f"Calculator generated: {calc_result.file_name}")
+                        if calc_result.drive_permalink:
+                            logger.info(f"Drive link: {calc_result.drive_permalink}")
+                    else:
+                        logger.error(f"Calculator generation failed: {calc_result.error}")
+
+                except Exception as e:
+                    logger.error(f"Calculator generation failed: {e}")
+                    normalized_result["calculator_result"] = {
+                        "success": False,
+                        "error": str(e)
+                    }
+
         # Summary
         logger.info("=" * 60)
         logger.info("ORCHESTRATION COMPLETE")
@@ -1022,6 +1090,13 @@ class Orchestrator:
                 logger.info(f"Zoho Quote: {quote_result.estimate_number} - {total_str} ({quote_result.line_items_count} line items)")
             else:
                 logger.info(f"Zoho Quote: FAILED - {quote_result.error}")
+        if calc_result:
+            if calc_result.success:
+                logger.info(f"Calculator: {calc_result.file_name} ({calc_result.products_count} products)")
+                if calc_result.drive_permalink:
+                    logger.info(f"Calculator Link: {calc_result.drive_permalink}")
+            else:
+                logger.info(f"Calculator: FAILED - {calc_result.error}")
 
         return normalized_result  # Return unified format for downstream workflows
 
@@ -1066,6 +1141,12 @@ Examples:
 
   # Full workflow: skip CUA, upload to Zoho, create quote
   %(prog)s <url> --skip-cua --zoho-upload --zoho-quote
+
+  # Generate client calculator spreadsheet
+  %(prog)s <url> --calculator
+
+  # Full workflow with calculator
+  %(prog)s <url> --zoho-upload --zoho-quote --calculator
 
 Supported URL Patterns:
   SAGE:  viewpresentation.com/*
@@ -1159,6 +1240,12 @@ Environment Variables:
         help="Create draft quote in Zoho Books after Item Master upload"
     )
 
+    parser.add_argument(
+        "--calculator",
+        action="store_true",
+        help="Generate client calculator spreadsheet and upload to Zoho WorkDrive"
+    )
+
     args = parser.parse_args()
     
     # Set logging level
@@ -1182,7 +1269,8 @@ Environment Variables:
         limit_products=args.limit_products,
         zoho_upload=zoho_upload,
         zoho_dry_run=args.zoho_dry_run,
-        zoho_quote=args.zoho_quote
+        zoho_quote=args.zoho_quote,
+        calculator=args.calculator
     )
     
     try:

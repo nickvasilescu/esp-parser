@@ -8,6 +8,7 @@ including OAuth2 authentication, Items API, Contacts API, and Custom Fields disc
 
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -871,28 +872,246 @@ class ZohoClient:
     def find_vendor_by_website(self, website_url: str) -> Optional[Dict[str, Any]]:
         """
         Find a vendor by website URL.
-        
+
         This is the primary vendor matching mechanism per Koell's requirements.
-        
+
         Args:
             website_url: Vendor website URL
-            
+
         Returns:
             Vendor contact if found, None otherwise
         """
         # Normalize URL for comparison
         website_lower = website_url.lower().replace("https://", "").replace("http://", "").rstrip("/")
-        
+
         vendors = self.get_vendors()
-        
+
         for vendor in vendors:
             vendor_website = vendor.get("website", "")
             if vendor_website:
                 vendor_website_lower = vendor_website.lower().replace("https://", "").replace("http://", "").rstrip("/")
                 if vendor_website_lower == website_lower:
                     return vendor
-        
+
         return None
+
+    # =========================================================================
+    # Zoho WorkDrive API
+    # =========================================================================
+
+    WORKDRIVE_API_BASE = "https://www.zohoapis.com/workdrive/api/v1"
+    _workdrive_access_token: Optional[str] = None
+    _workdrive_token_expires_at: float = 0
+
+    def _get_workdrive_access_token(self) -> str:
+        """
+        Get a valid access token for WorkDrive API.
+
+        Uses the separate ZOHO_WORKDRIVE_REFRESH_TOKEN if available.
+        """
+        # Check if we have a cached valid token
+        if self._workdrive_access_token and time.time() < self._workdrive_token_expires_at:
+            return self._workdrive_access_token
+
+        # Get WorkDrive-specific refresh token
+        workdrive_refresh_token = os.getenv("ZOHO_WORKDRIVE_REFRESH_TOKEN")
+        if not workdrive_refresh_token:
+            # Fall back to main refresh token
+            return self._get_access_token()
+
+        # Exchange refresh token for access token
+        response = requests.post(
+            "https://accounts.zoho.com/oauth/v2/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "refresh_token": workdrive_refresh_token
+            }
+        )
+
+        if response.status_code != 200:
+            raise ZohoAPIError(f"Failed to refresh WorkDrive token: {response.text}")
+
+        data = response.json()
+        self._workdrive_access_token = data.get("access_token")
+        # Token expires in 1 hour, refresh 5 minutes early
+        self._workdrive_token_expires_at = time.time() + data.get("expires_in", 3600) - 300
+
+        return self._workdrive_access_token
+
+    def _make_workdrive_request(
+        self,
+        method: str,
+        url: str,
+        params: Optional[Dict] = None,
+        json_data: Optional[Dict] = None,
+        files: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """
+        Make an authenticated request to Zoho WorkDrive API.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: Full URL or endpoint path
+            params: Query parameters
+            json_data: JSON body data
+            files: Files to upload
+
+        Returns:
+            Response JSON
+
+        Raises:
+            ZohoAPIError: If the request fails
+        """
+        # Build full URL if not already complete
+        if not url.startswith("http"):
+            url = f"{self.WORKDRIVE_API_BASE}/{url.lstrip('/')}"
+
+        headers = {
+            "Authorization": f"Zoho-oauthtoken {self._get_workdrive_access_token()}"
+        }
+
+        # Only add Content-Type for JSON requests (not file uploads)
+        if json_data and not files:
+            headers["Content-Type"] = "application/json"
+
+        logger.debug(f"WorkDrive API {method} {url}")
+
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                params=params,
+                json=json_data,
+                files=files
+            )
+
+            response_data = response.json() if response.content else {}
+
+            if response.status_code >= 400:
+                error_message = response_data.get("error", {}).get("message", response.text)
+                raise ZohoAPIError(
+                    f"WorkDrive API error: {error_message}",
+                    status_code=response.status_code,
+                    response=response_data
+                )
+
+            return response_data
+
+        except requests.RequestException as e:
+            raise ZohoAPIError(f"WorkDrive request failed: {e}")
+
+    def get_workdrive_team_folders(self, team_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all team folders in a team.
+
+        Args:
+            team_id: WorkDrive team ID
+
+        Returns:
+            List of team folder data
+        """
+        url = f"teams/{team_id}/teamfolders"
+        response = self._make_workdrive_request("GET", url)
+        return response.get("data", [])
+
+    def search_workdrive_team_folders(self, folder_name: str, team_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Search for a team folder by name.
+
+        Args:
+            folder_name: Name to search for (partial match)
+            team_id: WorkDrive team ID (defaults to ZOHO_WORKDRIVE_TEAM_ID env var)
+
+        Returns:
+            List of matching team folders
+        """
+        import os
+        team_id = team_id or os.getenv("ZOHO_WORKDRIVE_TEAM_ID")
+        if not team_id:
+            raise ValueError("ZOHO_WORKDRIVE_TEAM_ID not set. Set it in .env or pass team_id parameter.")
+
+        folders = self.get_workdrive_team_folders(team_id)
+
+        # Filter by name (case-insensitive partial match)
+        folder_name_lower = folder_name.lower()
+        matching = []
+        for folder in folders:
+            attrs = folder.get("attributes", {})
+            name = attrs.get("name", "")
+            if folder_name_lower in name.lower():
+                matching.append(folder)
+
+        return matching
+
+    def upload_file_to_workdrive(self, folder_id: str, file_path: str) -> Dict[str, Any]:
+        """
+        Upload a file to a WorkDrive folder.
+
+        Args:
+            folder_id: WorkDrive folder ID (parent_id)
+            file_path: Local path to the file
+
+        Returns:
+            Uploaded file data including id and permalink
+        """
+        import os
+
+        url = f"{self.WORKDRIVE_API_BASE}/upload"
+        params = {
+            "parent_id": folder_id,
+            "override-name-exist": "true"  # Overwrite if file exists
+        }
+
+        filename = os.path.basename(file_path)
+
+        with open(file_path, "rb") as f:
+            files = {"content": (filename, f)}
+            response = self._make_workdrive_request("POST", url, params=params, files=files)
+
+        # Response is {"data": [{"attributes": {...}}]} - extract first item
+        data = response.get("data", [])
+        if isinstance(data, list) and len(data) > 0:
+            item = data[0]
+            attrs = item.get("attributes", {})
+            return {
+                "id": attrs.get("resource_id"),
+                "attributes": {
+                    "permalink": attrs.get("Permalink"),
+                    "name": attrs.get("FileName")
+                }
+            }
+        return {}
+
+    def upload_to_cost_calculators(self, file_path: str) -> Dict[str, Any]:
+        """
+        Upload a file to the 'Cost Calculators' team folder.
+
+        This is a convenience method that uses the ZOHO_COST_CALCULATORS_FOLDER_ID
+        environment variable.
+
+        Args:
+            file_path: Local path to the file
+
+        Returns:
+            Uploaded file data including id and permalink
+
+        Raises:
+            ValueError: If ZOHO_COST_CALCULATORS_FOLDER_ID is not set
+        """
+        import os
+
+        folder_id = os.getenv("ZOHO_COST_CALCULATORS_FOLDER_ID")
+        if not folder_id:
+            raise ValueError(
+                "ZOHO_COST_CALCULATORS_FOLDER_ID not set. "
+                "Run 'python3 -c \"from zoho_client import ZohoClient; c = ZohoClient(); "
+                "print(c.search_workdrive_team_folders('Cost Calculators'))\"' to find the folder ID."
+            )
+
+        return self.upload_file_to_workdrive(folder_id, file_path)
 
 
 # =============================================================================
