@@ -728,7 +728,9 @@ class ZohoClient:
             return self._custom_fields_cache[entity]
         
         response = self._make_request("GET", f"/settings/customfields", params={"entity": entity})
-        custom_fields = response.get("customfields", [])
+        # Zoho returns customfields as a dict keyed by entity type
+        all_custom_fields = response.get("customfields", {})
+        custom_fields = all_custom_fields.get(entity, []) if isinstance(all_custom_fields, dict) else []
         
         # Cache the result
         self._custom_fields_cache[entity] = custom_fields
@@ -754,26 +756,64 @@ class ZohoClient:
             Dict mapping field names to custom field IDs (None if not found)
         """
         custom_fields = self.get_custom_fields(entity=entity)
-        
+
         field_map: Dict[str, Optional[str]] = {}
-        
+
+        # Track which Zoho field IDs have already been claimed to prevent collisions
+        # This prevents "category" substring from matching "Promo Category" after
+        # "promo category" already claimed it with an exact match
+        claimed_field_ids = set()
+
         for field_name, label_patterns in patterns.items():
             field_map[field_name] = None
-            
+
+            # First pass: Look for EXACT matches (prevents "category" matching "promo category")
             for cf in custom_fields:
+                if not isinstance(cf, dict):
+                    continue
+                cf_id = cf.get("customfield_id")
+                # Skip if this Zoho field was already claimed by another pattern
+                if cf_id in claimed_field_ids:
+                    continue
+
                 cf_label = cf.get("label", "").lower()
                 cf_name = cf.get("field_name", "").lower()
-                
+
                 for pattern in label_patterns:
                     pattern_lower = pattern.lower()
-                    if pattern_lower in cf_label or pattern_lower in cf_name:
-                        field_map[field_name] = cf.get("customfield_id")
-                        logger.debug(f"Matched custom field '{field_name}' -> {cf.get('label')} (ID: {cf.get('customfield_id')})")
+                    # Exact match on label or field_name
+                    if pattern_lower == cf_label or pattern_lower == cf_name:
+                        field_map[field_name] = cf_id
+                        claimed_field_ids.add(cf_id)
+                        logger.debug(f"Exact matched '{field_name}' -> {cf.get('label')} (ID: {cf_id})")
                         break
-                
                 if field_map[field_name]:
                     break
-            
+
+            # Second pass: Fall back to substring match if no exact match
+            if not field_map[field_name]:
+                for cf in custom_fields:
+                    if not isinstance(cf, dict):
+                        logger.warning(f"Unexpected custom field format: {type(cf)}")
+                        continue
+                    cf_id = cf.get("customfield_id")
+                    # Skip if this Zoho field was already claimed by another pattern
+                    if cf_id in claimed_field_ids:
+                        continue
+
+                    cf_label = cf.get("label", "").lower()
+                    cf_name = cf.get("field_name", "").lower()
+
+                    for pattern in label_patterns:
+                        pattern_lower = pattern.lower()
+                        if pattern_lower in cf_label or pattern_lower in cf_name:
+                            field_map[field_name] = cf_id
+                            claimed_field_ids.add(cf_id)
+                            logger.debug(f"Substring matched '{field_name}' -> {cf.get('label')} (ID: {cf_id})")
+                            break
+                    if field_map[field_name]:
+                        break
+
             if not field_map[field_name]:
                 logger.debug(f"No match found for custom field '{field_name}'")
         

@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "generated_at": "2025-12-11T18:58:49.354069",
+    "source_type": "esp",
+    "presentation_url": "https://portal.mypromooffice.com/presentations/500183020?accessCode=b07e67d01cbd4ca2ba71934d128e1a44",
+    "presentation_title": null,
+    "client": {},
+    "presenter": {},
+    "total_items_in_presentation": 0,
+    "total_items_processed": 0,
+    "total_errors": 2
+  },
+  "products": [
+    {
+      "error": "Connection error.",
+      "source_file": "output/pdfs/esp_20251211_180626/products/CPN-564949909_distributor_report.pdf"
+    }
+  ],
+  "errors": [
+    {
+      "step": "presentation_parse",
+      "message": "Connection error."
+    },
+    {
+      "step": "product_parse",
+      "source_file": "output/pdfs/esp_20251211_180626/products/CPN-564949909_distributor_report.pdf",
+      "message": "Connection error."
+    }
+  ],
+  "ready_for_zoho": true,
+  "zoho_integration_notes": {
+    "item_master": "Each product can be created as an Item in Zoho Books",
+    "quote_line_items": "For each product, create 3 line items: Product, Setup Fee, Estimated Shipping",
+    "sku_format": "[Client Account #] - [Vendor Item #]",
+    "track_inventory": false
+  },
+  "pricing_sources": {
+    "sell_price": "From presentation PDF (what client sees)",
+    "net_cost": "From distributor report PDF (what distributor pays)",
+    "margin_calculation": "sell_price - net_cost = margin"
+  }
+}

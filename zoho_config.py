@@ -75,46 +75,76 @@ ZOHO_QUOTE_DEFAULTS = {
 # The agent will search Zoho custom fields by label and match against these patterns
 # Only fields that match will be populated; others will be skipped
 CUSTOM_FIELD_PATTERNS: Dict[str, List[str]] = {
-    # Lead time
-    "lead_time": ["lead_time", "lead time", "production_time", "production time"],
-    
+    # === ITEMS CUSTOM FIELDS (match Koell's exact labels) ===
+
     # Colors
-    "colors_available": ["colors_available", "colors available", "available_colors", "available colors"],
-    "color_selected": ["color_selected", "selected_color", "chosen_color"],
-    "imprint_colors": ["imprint_colors", "imprint colors", "decoration_colors"],
-    
-    # Packaging & Shipping
-    "packaging": ["packaging", "package_info", "package info"],
-    "ship_point": ["ship_point", "ship point", "fob_point", "fob point"],
-    
-    # Pricing Data (raw grids stored as JSON)
-    "sell_price_grid": ["sell_price_grid", "sell_prices", "selling_prices"],
-    "cost_price_grid": ["cost_price_grid", "cost_prices", "net_costs", "purchase_prices"],
-    
-    # Vendor/EQP
-    "vendor_group": ["vendor_group", "eqp_status", "eqp status", "we_promo", "promo_eqp"],
-    
+    "color_options": ["color options", "color_options"],
+    "color_ordered": ["color ordered", "color_ordered"],
+    "imprint_color": ["imprint color", "imprint_color"],
+
+    # Decoration
+    "decoration_options": ["decoration options", "decoration_options"],
+    "decoration_method": ["decoration method", "decoration_method"],
+
+    # Production
+    "lead_time": ["lead time", "lead_time"],
+    "setup_info": ["setup info", "setup_info"],
+
     # Source/Provenance
-    "source_platform": ["source_platform", "source platform", "data_source"],
-    "presentation_url": ["presentation_url", "presentation url", "pres_url"],
-    "presentation_title": ["presentation_title", "presentation title", "pres_title"],
-    
-    # Identifiers
-    "cpn": ["cpn", "customer_product_number"],
-    "spc": ["spc", "sage_product_code"],
-    "prod_id": ["prod_id", "product_id", "sage_id"],
-    
-    # Fees (stored as JSON blob)
-    "fee_data": ["fee_data", "fees_blob", "additional_fees"],
-    
-    # Categories (if custom field exists)
-    "categories_raw": ["categories_raw", "raw_categories", "category_list"],
-    
-    # Margin
-    "margin_percent": ["margin_percent", "margin_percentage", "profit_margin"],
-    
-    # Inventory note
-    "inventory_note": ["inventory_note", "inventory note", "stock_note", "stock check"],
+    "info_source": ["info source", "info_source"],
+    "presentation_link": ["presentation link", "presentation_link"],
+
+    # Categories (IMPORTANT: Order matters - more specific patterns first)
+    # "Promo Category" text field → detailed ESP category like "Beverages- Wine/champagne/liquor"
+    "promo_category": ["promo category"],
+    # "Category" dropdown → "Promo", "Print", or "Apparel"
+    # NOTE: Plain "category" MUST come AFTER "promo category" check to avoid collision
+    "product_category": ["cf_category", "item category", "product category", "category"],
+
+    # Sustainability
+    "sustainability_credential": ["sustainability credential", "sustainability_credential"],
+    "recycled_content": ["recycled content", "recycled_content"],
+
+    # Other
+    "buying_group": ["buying group", "buying_group"],
+    "mfg_description": ["mfg description", "mfg_description"],
+    "materials": ["materials", "material"],
+    "themes": ["themes", "theme"],
+
+    # Dimensions & Weight
+    "dimensions": ["dimensions", "product dimensions", "item dimensions"],
+    "weight": ["weight", "item weight", "product weight"],
+
+    # Shipping
+    "ship_point": ["ship point", "ship_point", "fob", "fob point"],
+    "units_per_carton": ["units per carton", "units_per_carton", "carton qty"],
+    "carton_weight": ["carton weight", "weight per carton"],
+    "packaging": ["packaging", "pack type"],
+    "rush_available": ["rush available", "rush"],
+
+    # Vendor Contact
+    "vendor_contact": ["vendor contact", "supplier contact"],
+    "vendor_email": ["vendor email", "supplier email"],
+    "vendor_phone": ["vendor phone", "supplier phone"],
+    "vendor_address": ["vendor address", "supplier address"],
+    "vendor_account_num": ["vendor account", "our account", "customer number"],
+    "vendor_cs_rep": ["cs rep", "customer service rep"],
+
+    # Industry IDs
+    "asi_number": ["asi number", "asi"],
+    "sage_id": ["sage id", "sage number"],
+
+    # Pricing
+    "price_valid_through": ["price valid through", "pricing expires", "valid through"],
+
+    # Variants & Images
+    "variants": ["variants", "options", "product options"],
+    "product_images": ["product images", "images", "image urls"],
+
+    # === CONTACTS/VENDORS CUSTOM FIELDS ===
+    "stbl_account_number": ["stbl account number", "stbl_account_number"],
+    "artwork_email": ["artwork"],
+    "rush_contact_email": ["rush contact"],
 }
 
 

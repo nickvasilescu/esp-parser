@@ -112,7 +112,22 @@ class SAGEProduct:
     imprint_info_text: Optional[str] = None
     packaging_text: Optional[str] = None
     dimensions: Optional[str] = None
-    
+    themes: Optional[str] = None
+
+    # Decoration (from Full Product Detail API)
+    decoration_method: Optional[str] = None
+    imprint_area: Optional[str] = None
+    imprint_loc: Optional[str] = None
+    second_imprint_area: Optional[str] = None
+    second_imprint_loc: Optional[str] = None
+
+    # Sustainability (from Full Product Detail API)
+    recyclable: bool = False
+    env_friendly: bool = False
+
+    # Production (from Full Product Detail API)
+    prod_time: Optional[str] = None  # Lead time!
+
     # Shipping
     ship_point: Optional[str] = None
     units_per_carton: Optional[int] = None
@@ -359,21 +374,28 @@ def extract_pres_id_from_url(url: str) -> int | str:
         pres_code = sageconnect_match.group(1)
         logger.info(f"Extracted presentation code '{pres_code}' from sageconnect URL")
         return pres_code
-    
-    # Try viewpresentation.com format (numeric ID)
+
+    # Try viewpresentation.com/p/ format (alphanumeric code like "10041-dh2z")
+    vp_code_match = re.search(r'viewpresentation\.com/p/([A-Za-z0-9\-]+)', url)
+    if vp_code_match:
+        pres_code = vp_code_match.group(1)
+        logger.info(f"Extracted presentation code '{pres_code}' from viewpresentation.com/p/ URL")
+        return pres_code
+
+    # Try viewpresentation.com format with numeric ID (legacy format)
     match = re.search(r'viewpresentation\.com/(\d+)', url)
     if not match:
         raise ValueError(f"Invalid SAGE presentation URL: {url}")
-    
+
     url_number = match.group(1)
-    
+
     # The presId is embedded - strip first 4 chars for URLs with prefix
     # URL: 66907679185 → presId: 7679185
     if len(url_number) > 7:
         pres_id = int(url_number[4:])
     else:
         pres_id = int(url_number)
-    
+
     logger.info(f"Extracted presId {pres_id} from URL number {url_number}")
     return pres_id
 
@@ -677,11 +699,56 @@ def enrich_products_with_net_costs(
             # Extract authoritative net costs from Full Product Detail
             net_costs = detail.get("net", [])
             qtys = detail.get("qty", [])
-            
+
             logger.info(f"  Product: {product.name[:40]}...")
             logger.info(f"    Presentation qtys: {[pb.quantity for pb in product.price_breaks]}")
             logger.info(f"    Full Detail qtys: {qtys}")
             logger.info(f"    Full Detail net: {net_costs}")
+
+            # === Extract additional fields from Full Product Detail API ===
+            # Production Time (Lead Time)
+            prod_time = detail.get("prodTime")
+            if prod_time:
+                product.prod_time = prod_time
+                logger.debug(f"    Lead time: {prod_time}")
+
+            # Decoration Method
+            deco_method = detail.get("decorationMethod")
+            if deco_method:
+                product.decoration_method = deco_method
+                logger.debug(f"    Decoration method: {deco_method}")
+
+            # Imprint Areas
+            imprint_area = detail.get("imprintArea")
+            imprint_loc = detail.get("imprintLoc")
+            if imprint_area:
+                product.imprint_area = imprint_area
+            if imprint_loc:
+                product.imprint_loc = imprint_loc
+
+            # Second Imprint Area
+            second_area = detail.get("secondImprintArea")
+            second_loc = detail.get("secondImprintLoc")
+            if second_area:
+                product.second_imprint_area = second_area
+            if second_loc:
+                product.second_imprint_loc = second_loc
+
+            # Sustainability flags
+            if detail.get("recyclable"):
+                product.recyclable = True
+            if detail.get("envFriendly"):
+                product.env_friendly = True
+
+            # Themes
+            themes = detail.get("themes")
+            if themes:
+                product.themes = themes
+
+            # Price Includes
+            price_includes = detail.get("priceIncludes")
+            if price_includes:
+                product.price_includes = price_includes
             
             if net_costs and qtys:
                 # Create a lookup of net costs by quantity
@@ -1043,7 +1110,11 @@ class SAGEHandler:
                     "description": p.description,
                     "category": p.category,
                     "colors": p.colors,
-                    "dimensions": p.dimensions
+                    "dimensions": p.dimensions,
+                    "themes": p.themes,
+                    # Sustainability flags from Full Product Detail API
+                    "recyclable": p.recyclable,
+                    "env_friendly": p.env_friendly
                 },
                 "vendor": vendor,
                 "pricing": {
@@ -1053,13 +1124,21 @@ class SAGEHandler:
                 },
                 "fees": fees,
                 "decoration": {
-                    "imprint_info": p.imprint_info_text
+                    "imprint_info": p.imprint_info_text,
+                    # From Full Product Detail API
+                    "decoration_method": p.decoration_method,
+                    "imprint_area": p.imprint_area,
+                    "imprint_loc": p.imprint_loc,
+                    "second_imprint_area": p.second_imprint_area,
+                    "second_imprint_loc": p.second_imprint_loc
                 },
                 "shipping": {
                     "ship_point": p.ship_point,
                     "units_per_carton": p.units_per_carton,
                     "weight_per_carton": p.weight_per_carton,
-                    "packaging": p.packaging_text
+                    "packaging": p.packaging_text,
+                    # Lead Time from Full Product Detail API
+                    "lead_time": p.prod_time
                 },
                 "images": p.image_urls,
                 "additional_charges_text": p.additional_charges_text

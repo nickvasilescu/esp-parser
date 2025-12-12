@@ -138,7 +138,11 @@ class UnifiedItem:
     dimensions: Optional[UnifiedDimensions] = None
     weight_value: Optional[float] = None
     weight_unit: Optional[str] = None
-    
+
+    # Sustainability
+    sustainability_credential: Optional[str] = None  # e.g., "Recyclable", "Environmentally Friendly"
+    recycled_content: Optional[float] = None  # Percentage
+
     # Assembly
     item_assembled: Optional[bool] = None
 

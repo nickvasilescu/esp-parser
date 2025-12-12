@@ -1,0 +1,2015 @@
+{
+  "presentation": {
+    "title": null,
+    "client_name": null,
+    "client_company": null,
+    "presenter_name": null,
+    "presenter_company": "STBL Strategies",
+    "presenter_website": "stblstrategies.com",
+    "presenter_email": null,
+    "presenter_phone": null,
+    "date": null,
+    "notes": null
+  },
+  "products": [
+    {
+      "cpn": "CPN-564949909",
+      "name": "Etched Pinot Noir Red Wine Bottle",
+      "description": "Mark a big milestone with this 750ml California pinot noir bottle. This item uses deep hand etching and optional hand-painted color fills, exemplifying superior craftsmanship. With a 5-star rating maintained\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Red"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etch"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$58.80 - $75.16",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 75.16
+        },
+        {
+          "quantity": 48,
+          "sell_price": 69.0
+        },
+        {
+          "quantity": 108,
+          "sell_price": 64.42
+        },
+        {
+          "quantity": 204,
+          "sell_price": 61.12
+        },
+        {
+          "quantity": 300,
+          "sell_price": 58.8
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 1,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564949899",
+      "name": "Etched Chardonnay White Wine Bottle",
+      "description": "Convey your thanks with a tasteful gift. This 750ml. chardonnay white wine bottle, etched with optional color fills, is a testament to superior craftsmanship. Each bottle is carefully hand-crafted by artisans in ou\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "White"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etch"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$58.80 - $75.16",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 75.16
+        },
+        {
+          "quantity": 48,
+          "sell_price": 69.0
+        },
+        {
+          "quantity": 108,
+          "sell_price": 64.42
+        },
+        {
+          "quantity": 204,
+          "sell_price": 61.12
+        },
+        {
+          "quantity": 300,
+          "sell_price": 58.8
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "Optional color fills",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 2,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564949753",
+      "name": "Etched Cabernet Sauvignon Red Wine Bottle",
+      "description": "Consider a distinguished gift that speaks volumes of quality and craftsmanship. This 750ml. cabernet sauvignon red wine bottle features deep hand etching and optional hand-painted color fills. Wit\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Red"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etch"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$58.80 - $75.16",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 75.16
+        },
+        {
+          "quantity": 48,
+          "sell_price": 69.0
+        },
+        {
+          "quantity": 108,
+          "sell_price": 64.42
+        },
+        {
+          "quantity": 204,
+          "sell_price": 61.12
+        },
+        {
+          "quantity": 300,
+          "sell_price": 58.8
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 3,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951771",
+      "name": "Etched Jordan Cabernet Alexander Valley Red Wine Bottle",
+      "description": "Embark on a sensory journey with this unforgettable 750ml Jordan Alexander cabernet bottle, a wine that captivates with its intricate and vibrant scent of red plum, anise, cherry, violets, and tobacco, enrich\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Hand Etched"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$172.30 - $190.08",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 190.08
+        },
+        {
+          "quantity": 48,
+          "sell_price": 182.5
+        },
+        {
+          "quantity": 108,
+          "sell_price": 177.93
+        },
+        {
+          "quantity": 204,
+          "sell_price": 174.63
+        },
+        {
+          "quantity": 300,
+          "sell_price": 172.3
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "2 Colors Available, 3 Colors Available",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Hand Etched, Hand-Painted",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 4,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951764",
+      "name": "Etched Duckhorn Decoy Cabernet Red Wine Bottle",
+      "description": "For a distinguished gift or a refined addition to any event, this 750 ml. Duckhorn cabernet sauvignon bottle is an excellent choice. From its deep, inviting color to the enticing aromas of blackberry, currant, an\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etched"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$83.02 - $106.29",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 106.29
+        },
+        {
+          "quantity": 48,
+          "sell_price": 93.93
+        },
+        {
+          "quantity": 108,
+          "sell_price": 88.65
+        },
+        {
+          "quantity": 204,
+          "sell_price": 85.35
+        },
+        {
+          "quantity": 300,
+          "sell_price": 83.02
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etched",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 5,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951746",
+      "name": "Etched Coppola Diamond Cabernet Red Wine Bottle",
+      "description": "This 750ml Coppola cabernet bottle offers a powerfully complex wine with a classic flavor profile and youthful maturity. This sophisticated bottle is deeply hand-etched and hand-painted, featuring a one-colo\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Hand Etched",
+        "Hand-Painted"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$67.98 - $91.47",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 91.47
+        },
+        {
+          "quantity": 48,
+          "sell_price": 78.19
+        },
+        {
+          "quantity": 108,
+          "sell_price": 73.6
+        },
+        {
+          "quantity": 204,
+          "sell_price": 70.3
+        },
+        {
+          "quantity": 300,
+          "sell_price": 67.98
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "2 Colors Available, 3 Colors Available",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Hand Etched, Hand-Painted",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 6,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951667",
+      "name": "Etched Robert Mondavi Private Select Cabernet Red Wine Bottle",
+      "description": "Uncork a bottle that brings the richness of black cherry, blackberry, vanilla, toasty oak, and coffee to life. This 750ml. Robert Mondavi wine bottle offers a symphony of flavors, with soft red and black fruit note\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Hand Etched",
+        "Hand-Painted"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$42.30 - $80.10",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 80.1
+        },
+        {
+          "quantity": 48,
+          "sell_price": 72.42
+        },
+        {
+          "quantity": 108,
+          "sell_price": 67.84
+        },
+        {
+          "quantity": 204,
+          "sell_price": 44.62
+        },
+        {
+          "quantity": 300,
+          "sell_price": 42.3
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "2 Colors Available, 3 Colors Available",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Hand-Painted",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 7,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951559",
+      "name": "Etched Cakebread Cabernet Red Wine Bottle",
+      "description": "Celebrate the artistry of this 750ml. Cakebread cabernet bottle, a wine that epitomizes sophistication. This bottle includes deep hand etching and optional hand-painted color fills. With a 5-star rating for over 15\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Etched"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$242.31 - $263.67",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 263.67
+        },
+        {
+          "quantity": 48,
+          "sell_price": 252.51
+        },
+        {
+          "quantity": 108,
+          "sell_price": 247.92
+        },
+        {
+          "quantity": 204,
+          "sell_price": 244.62
+        },
+        {
+          "quantity": 300,
+          "sell_price": 242.31
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 9,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951521",
+      "name": "Etched Far Niente Cabernet Red Wine Bottle",
+      "description": "For an elegant touch in employee appreciation, select this 750ml. Far Niente cabernet bottle. This luxurious bottle is meticulously hand-crafted by artisans in our California facility, featuring deep hand\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Etched"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$282.30 - $358.66",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 358.66
+        },
+        {
+          "quantity": 48,
+          "sell_price": 292.5
+        },
+        {
+          "quantity": 108,
+          "sell_price": 287.92
+        },
+        {
+          "quantity": 204,
+          "sell_price": 284.62
+        },
+        {
+          "quantity": 300,
+          "sell_price": 282.3
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 10,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951462",
+      "name": "Etched Charles Krug Cabernet Napa Red Wine Bottle",
+      "description": "Recognize your employees' hard work with this 750 milliliter Charles Krug cabernet bottle. This product, featuring deep hand etching and optional hand-painted color fills, reflects our 15-year legacy of 5-star\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Etched"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$103.72 - $124.38",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 124.38
+        },
+        {
+          "quantity": 48,
+          "sell_price": 113.92
+        },
+        {
+          "quantity": 108,
+          "sell_price": 109.35
+        },
+        {
+          "quantity": 204,
+          "sell_price": 106.05
+        },
+        {
+          "quantity": 300,
+          "sell_price": 103.72
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 11,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951450",
+      "name": "Etched Stag's Leap Cellars Artemis Cabernet Red Wine Bottle",
+      "description": "This 750ml. Stag's Leap Cellars cabernet bottle, renowned for its deep hand etching and optional hand-painted color fills, is a testament to craftsmanship. Proudly produced by our 5-star rated custom labelin\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Etched"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$213.70 - $270.06",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 270.06
+        },
+        {
+          "quantity": 48,
+          "sell_price": 223.9
+        },
+        {
+          "quantity": 108,
+          "sell_price": 219.33
+        },
+        {
+          "quantity": 204,
+          "sell_price": 216.03
+        },
+        {
+          "quantity": 300,
+          "sell_price": 213.7
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 12,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564951399",
+      "name": "Etched The Prisoner Red Blend Wine Bottle",
+      "description": "Show appreciation to your employees with this 750ml The Prisoner red wine bottle. This refined bottle, adorned with intricate deep hand etching and optional hand-painted color fills, represents our 15-year\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Etched"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$138.31 - $154.66",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 154.66
+        },
+        {
+          "quantity": 48,
+          "sell_price": 148.5
+        },
+        {
+          "quantity": 108,
+          "sell_price": 143.92
+        },
+        {
+          "quantity": 204,
+          "sell_price": 140.62
+        },
+        {
+          "quantity": 300,
+          "sell_price": 138.31
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 13,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564954187",
+      "name": "Etched Far Niente Chardonnay White Wine Bottle",
+      "description": "Consider this 750-milliliter Far Niente chardonnay bottle for your next corporate event or holiday gift. Each bottle is deeply hand-etched and optionally hand-painted, crafted by artisans in our California facility.\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Green"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Hand Etching"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$175.65 - $200.01",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 200.01
+        },
+        {
+          "quantity": 48,
+          "sell_price": 185.85
+        },
+        {
+          "quantity": 108,
+          "sell_price": 181.26
+        },
+        {
+          "quantity": 204,
+          "sell_price": 177.96
+        },
+        {
+          "quantity": 300,
+          "sell_price": 175.65
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Hand Etching, Hand-Painted Color Fills",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 14,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564954075",
+      "name": "Etched Taittinger Brut La Francaise Champagne Bottle",
+      "description": "Ideal for gifting or enjoying on special occasions, this 750ml Taittinger champagne bottle offers a delightful sensory experience. This champagne exudes aromas of fruit and brioche, complemented by t\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etch"
+      ],
+      "imprint_sizes": "4\" x 3\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$150.31 - $186.66",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 186.66
+        },
+        {
+          "quantity": 48,
+          "sell_price": 164.5
+        },
+        {
+          "quantity": 108,
+          "sell_price": 155.92
+        },
+        {
+          "quantity": 204,
+          "sell_price": 152.62
+        },
+        {
+          "quantity": 300,
+          "sell_price": 150.31
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 15,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564954424",
+      "name": "Etched Yatir Mt. Amasa Kosher White Wine Bottle",
+      "description": "Reward your employees with this 750ml. Yatir Mt. Amasa white wine bottle, a symbol of appreciation and excellence. Each bottle is meticulously crafted by artisans in our California facility, adorned wit\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Hand Etching"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$117.09 - $133.44",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 133.44
+        },
+        {
+          "quantity": 48,
+          "sell_price": 127.29
+        },
+        {
+          "quantity": 108,
+          "sell_price": 122.7
+        },
+        {
+          "quantity": 204,
+          "sell_price": 119.4
+        },
+        {
+          "quantity": 300,
+          "sell_price": 117.09
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Hand Etching, Hand-Painted Color Fills",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 16,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564954410",
+      "name": "Etched Franciscan Napa Chardonnay White Wine Bottle",
+      "description": "Imagine a bottle that not only holds delicious wine but also tells a story through its artistry. This 750ml. Franciscan chardonnay bottle, featuring deep hand etching and optional hand-painted color fills,\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Green"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Hand Etching"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$86.26 - $102.63",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 102.63
+        },
+        {
+          "quantity": 48,
+          "sell_price": 96.46
+        },
+        {
+          "quantity": 108,
+          "sell_price": 91.89
+        },
+        {
+          "quantity": 204,
+          "sell_price": 88.59
+        },
+        {
+          "quantity": 300,
+          "sell_price": 86.26
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Hand Etching, Hand-Painted Color Fills",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 17,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564954639",
+      "name": "Etched Duckhorn Decoy Chardonnay White Wine Bottle",
+      "description": "For a touch of luxury in gifting, choose this 750ml Duckhorn Decoy chardonnay bottle. This exquisite white wine features layers of apricot, citrus, and summer melon, with hints of fresh honeysuckle. The palat\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etch"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$78.27 - $96.64",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 96.64
+        },
+        {
+          "quantity": 48,
+          "sell_price": 88.47
+        },
+        {
+          "quantity": 108,
+          "sell_price": 83.88
+        },
+        {
+          "quantity": 204,
+          "sell_price": 80.58
+        },
+        {
+          "quantity": 300,
+          "sell_price": 78.27
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 18,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564954631",
+      "name": "Etched Robert Mondavi Napa Valley Chardonnay White Wine Bottle",
+      "description": "This 750 ml. Robert Mondavi chardonnay bottle offers a delightful blend of ripe Asian pear, red apple fruit, and creme brulee, complemented by toasted almonds, hazelnuts, lemon rind, and ginge\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etch"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$112.30 - $132.66",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 132.66
+        },
+        {
+          "quantity": 48,
+          "sell_price": 122.5
+        },
+        {
+          "quantity": 108,
+          "sell_price": 117.93
+        },
+        {
+          "quantity": 204,
+          "sell_price": 114.63
+        },
+        {
+          "quantity": 300,
+          "sell_price": 112.3
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 19,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564963262",
+      "name": "Laser-Engraved Wood Box w/Custom Etched Chardonnay Wine Bottle",
+      "description": "Express your gratitude with an elegant corporate gift. This wine gift set features a 750ml. bottle of chardonnay wine, deep-etched and hand-painted with a 1-color fill (additional colors available for an extr\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Laser Engraved",
+        "Deep Etched"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$136.36 - $154.05",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 154.05
+        },
+        {
+          "quantity": 48,
+          "sell_price": 147.76
+        },
+        {
+          "quantity": 108,
+          "sell_price": 142.38
+        },
+        {
+          "quantity": 204,
+          "sell_price": 138.69
+        },
+        {
+          "quantity": 300,
+          "sell_price": 136.36
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "packaging",
+          "name": "Protective Packaging",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Laser Engraved",
+          "price": 93.75,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fills",
+          "price": null,
+          "is_qur": true
+        }
+      ],
+      "page_number": 20,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-565013164",
+      "name": "Etched Beringer Knight's Valley Cabernet Red Wine Bottle",
+      "description": "Elevate your wine collection with this 750ml. Beringer Knight's Valley cabernet sauvignon bottle. This exquisite wine, sourced from Napa Valley's renowned Knight's Valley appellation, embodies the rich\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Black"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Etch"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$96.88 - $115.38",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 115.38
+        },
+        {
+          "quantity": 48,
+          "sell_price": 107.88
+        },
+        {
+          "quantity": 108,
+          "sell_price": 102.5
+        },
+        {
+          "quantity": 204,
+          "sell_price": 99.2
+        },
+        {
+          "quantity": 300,
+          "sell_price": 96.88
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "setup",
+          "name": "Deep Etch",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 22,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564635505",
+      "name": "Laser-Engraved Wood Box with Custom Etched Wine and Glasses",
+      "description": "For an elegant gifting solution, consider this wine gift set, featuring your choice of wine with a deep-etched bottle, hand-painted with a 1-color fill (additional colors available for an extra charge). Accompani\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [],
+      "materials": [
+        "Wood"
+      ],
+      "imprint_methods": [
+        "Laser Engraved",
+        "Deep Etched"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": "Laser Engraved on Box, Deep Etch on Wine and Glasses",
+      "production_time": "5 business days",
+      "price_range": "$136.36 - $154.05",
+      "price_includes": null,
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 154.05
+        },
+        {
+          "quantity": 48,
+          "sell_price": 147.76
+        },
+        {
+          "quantity": 108,
+          "sell_price": 142.38
+        },
+        {
+          "quantity": 204,
+          "sell_price": 138.69
+        },
+        {
+          "quantity": 300,
+          "sell_price": 136.36
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "packaging",
+          "name": "Protective Packaging",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "Laser Engraved",
+          "price": 93.75,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 23,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564635661",
+      "name": "Laser-Engraved Wood Box with Custom Etched Wine Bottle",
+      "description": "Celebrate life's special moments with this elegant wine gift set. Included is your choice of wine in a deep-etched bottle and painted 1-color fill, with additional colors available for an extra charge. Our slid\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [],
+      "materials": [
+        "Wood"
+      ],
+      "imprint_methods": [
+        "Laser Engraved",
+        "Deep Etched"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": "Laser Engraved on Box, Deep Etch on Wine",
+      "production_time": "5 business days",
+      "price_range": "$92.80 - $109.17",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 109.17
+        },
+        {
+          "quantity": 48,
+          "sell_price": 103.0
+        },
+        {
+          "quantity": 108,
+          "sell_price": 98.43
+        },
+        {
+          "quantity": 204,
+          "sell_price": 95.13
+        },
+        {
+          "quantity": 300,
+          "sell_price": 92.8
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "packaging",
+          "name": "Protective Packaging",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "Laser Engraved",
+          "price": 93.75,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 25,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564954433",
+      "name": "Etched Flowers Rose Wine Bottle",
+      "description": "For a memorable gift or a delightful addition to any event, consider this 750ml. rose wine bottle, exquisitely detailed with deep hand etching and optional hand-painted color fills. With a stellar 5-star rating\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Deep Hand Etching"
+      ],
+      "imprint_sizes": null,
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$85.17 - $135.81",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 135.81
+        },
+        {
+          "quantity": 48,
+          "sell_price": 95.37
+        },
+        {
+          "quantity": 108,
+          "sell_price": 90.78
+        },
+        {
+          "quantity": 204,
+          "sell_price": 87.48
+        },
+        {
+          "quantity": 300,
+          "sell_price": 85.17
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Hand Etching, Hand-Painted Color Fills",
+          "price": 156.25,
+          "is_qur": false
+        }
+      ],
+      "page_number": 27,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564963290",
+      "name": "Laser-Engraved Wood Box w/Custom Etched Pinot Noir Wine Bottle",
+      "description": "Consider gifting this sophisticated wine gift set as a show of appreciation. This set features a 750ml. bottle of pinot noir, meticulously deep-etched and hand-painted with a one-color fill, wit\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [
+        "750 ml"
+      ],
+      "materials": [],
+      "imprint_methods": [
+        "Laser Engraved",
+        "Deep Etched"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": null,
+      "production_time": "5 business days",
+      "price_range": "$136.36 - $154.05",
+      "price_includes": "One color fill",
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 154.05
+        },
+        {
+          "quantity": 48,
+          "sell_price": 147.76
+        },
+        {
+          "quantity": 108,
+          "sell_price": 142.38
+        },
+        {
+          "quantity": 204,
+          "sell_price": 138.69
+        },
+        {
+          "quantity": 300,
+          "sell_price": 136.36
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "packaging",
+          "name": "Protective Packaging",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Laser Engraved",
+          "price": 93.75,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 3 Color",
+          "price": 20.0,
+          "is_qur": false
+        },
+        {
+          "type": "imprint_option",
+          "name": "Hand-painted Color Fills",
+          "price": null,
+          "is_qur": true
+        }
+      ],
+      "page_number": 28,
+      "notes": null
+    },
+    {
+      "cpn": "CPN-564635517",
+      "name": "Laser-Engraved Wood Box with Custom Etched Two Wine Bottles",
+      "description": "Express your gratitude to your team by gifting them this tasteful wine gift set. Included are two deep-etched and painted bottles with a 1-color fill housed inside a slide-top rustic wood box that can be laser-\u2026",
+      "supplier_name": null,
+      "supplier_asi": null,
+      "colors": [
+        "Brown"
+      ],
+      "sizes": [
+        "14 \" x 8.5 \""
+      ],
+      "materials": [
+        "Wood"
+      ],
+      "imprint_methods": [
+        "Laser Engraved",
+        "Deep Etched"
+      ],
+      "imprint_sizes": "3\" x 4\"",
+      "imprint_locations": "Laser Engraved on Box, Deep Etch on Wine",
+      "production_time": "5 business days",
+      "price_range": "$150.45 - $183.16",
+      "price_includes": null,
+      "pricing_breaks": [
+        {
+          "quantity": 12,
+          "sell_price": 183.16
+        },
+        {
+          "quantity": 48,
+          "sell_price": 170.85
+        },
+        {
+          "quantity": 108,
+          "sell_price": 161.68
+        },
+        {
+          "quantity": 204,
+          "sell_price": 155.08
+        },
+        {
+          "quantity": 300,
+          "sell_price": 150.45
+        }
+      ],
+      "additional_charges": [
+        {
+          "type": "packaging",
+          "name": "Protective Packaging",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "Color Fill",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "setup",
+          "name": "Deep Etched",
+          "price": 156.25,
+          "is_qur": false
+        },
+        {
+          "type": "setup",
+          "name": "Laser Engraved",
+          "price": 93.75,
+          "is_qur": false
+        },
+        {
+          "type": "product_option",
+          "name": "name brand wine, French champagne, wax dipped bottles, custom die-cut hang tags, card inserts",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 1 Color",
+          "price": null,
+          "is_qur": true
+        },
+        {
+          "type": "imprint_option",
+          "name": "750ml 2 Color",
+          "price": 10.0,
+          "is_qur": false
+        }
+      ],
+      "page_number": 30,
+      "notes": null
+    }
+  ],
+  "metadata": {
+    "total_products": 27,
+    "extraction_notes": "All 27 products extracted from 31-page ESP presentation. Page 8 contained continuation of additional charges for product on page 7."
+  }
+}

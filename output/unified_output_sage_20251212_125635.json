@@ -1,0 +1,2773 @@
+{
+  "success": true,
+  "metadata": {
+    "generated_at": "2025-12-12T12:56:35.351055",
+    "source": "sage",
+    "presentation_url": "https://www.viewpresentation.com/66907679185",
+    "presentation_title": "Otava Q4 2025 Promo",
+    "presentation_date": null,
+    "pres_id": null,
+    "total_items": 0,
+    "items_processed": 0,
+    "errors": 0,
+    "api_version": null,
+    "pricing_sources": {
+      "sell_price": "From SAGE Presentation API (serviceId 301)",
+      "net_cost": "From SAGE Full Product Detail API (serviceId 105)",
+      "catalog_price": "MSRP/List price from catalog"
+    }
+  },
+  "client": {
+    "id": null,
+    "name": null,
+    "company": null,
+    "email": null,
+    "phone": null,
+    "tax_rate": null
+  },
+  "presenter": {
+    "name": null,
+    "company": null,
+    "phone": null,
+    "email": null,
+    "website": null
+  },
+  "products": [
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "CE053",
+        "vendor_sku": "CE053",
+        "cpn": null,
+        "spc": "MWGVW-GQXTS",
+        "prod_id": 7510533,
+        "encrypted_prod_id": "987510533",
+        "pres_item_id": 55734674,
+        "internal_item_num": "CE053",
+        "item_num": "MWGVW-GQXTS"
+      },
+      "item": {
+        "name": "27 oz Tritan Wide Mouth Water Bottle",
+        "description": "27 oz. water bottle crafted from durable BPA-Free Tritan Plastic. Classic style, ultra light so it doesn't weigh you down. Single-wall, designed for use with cool and room temperature beverages only. Tethered, twist-on PP + PE Plastic lid. Wide-mouth for ice cubes and easy cleaning. Hand wash only; do not microwave or place in freezer.  8.2700\" H x 3.8900\" Diameter",
+        "description_short": null,
+        "categories": [
+          "Bottles"
+        ],
+        "themes": [],
+        "materials": [],
+        "colors": [
+          "Black",
+          "Campus Purple",
+          "Classic Navy",
+          "Classic Red",
+          "Safety Yellow",
+          "True Royal",
+          "White"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "8.2700\" H x 3.8900\" D"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Prime Line®",
+        "website": "www.primeline.com",
+        "asi": null,
+        "sage_id": "53170",
+        "contact_name": null,
+        "email": "orders@primeline.com",
+        "phone": "877.858.9908",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Trevose",
+          "state": "PA",
+          "postal_code": "19053",
+          "country": null
+        },
+        "line_name": "Prime Line/Harriton (53170)/Columbia (53170)/CORE365/DRI DUCK (53170)/econscious (53170)/Game Time!®/Goofy Group™/Grosche® (53170)/Ice Shaker (53170)/Leeman™/MopTopper™/North End®/Oakley (53170)/Raref",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 48,
+            "sell_price": 8.43,
+            "net_cost": 5.06,
+            "catalog_price": 8.43,
+            "margin": 3.37,
+            "margin_percent": 39.98,
+            "notes": null
+          },
+          {
+            "quantity": 96,
+            "sell_price": 8.27,
+            "net_cost": 4.97,
+            "catalog_price": 8.27,
+            "margin": 3.3,
+            "margin_percent": 39.9,
+            "notes": null
+          },
+          {
+            "quantity": 240,
+            "sell_price": 8.0,
+            "net_cost": 4.8,
+            "catalog_price": 8.0,
+            "margin": 3.2,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 480,
+            "sell_price": 7.58,
+            "net_cost": 4.55,
+            "catalog_price": 7.58,
+            "margin": 3.03,
+            "margin_percent": 39.97,
+            "notes": null
+          },
+          {
+            "quantity": 960,
+            "sell_price": 7.21,
+            "net_cost": 4.33,
+            "catalog_price": 7.21,
+            "margin": 2.88,
+            "margin_percent": 39.94,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": null,
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 57.5,
+          "net_cost": 57.5,
+          "price_code": "G",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "repeat",
+          "name": "Repeat/Reorder Charge",
+          "description": null,
+          "list_price": 27.5,
+          "net_cost": 27.5,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "pms",
+          "name": "PMS Color Match Charge",
+          "description": null,
+          "list_price": 40.0,
+          "net_cost": 40.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "sample",
+          "name": "Spec Sample Charge",
+          "description": null,
+          "list_price": 40.0,
+          "net_cost": 40.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "copy_change",
+          "name": "Copy Change Charge",
+          "description": null,
+          "list_price": 25.0,
+          "net_cost": 25.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Screen",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Screen.  3.5\" W x 4.5\" H; Standard Side imprint area.  7\" W x 4.5\" H; Wrap around second imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": null,
+        "fob_points": [],
+        "units_per_carton": null,
+        "weight_per_carton": null,
+        "carton_dimensions": null,
+        "packaging": "Bulk.",
+        "lead_time": "Approximately 5 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $57.50; Colors:   (R)\r\nSizes:  OS (0.00) (R)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734674&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734674&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Bulk.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $57.50; Colors:   (R)\r\nSizes:  OS (0.00) (R)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "POCH-FXLT-CAL",
+        "vendor_sku": "POCH-FXLT-CAL",
+        "cpn": null,
+        "spc": "ESNJW-IHVKW",
+        "prod_id": 6128517,
+        "encrypted_prod_id": "546128517",
+        "pres_item_id": 55734675,
+        "internal_item_num": "POCH-FXLT-CAL",
+        "item_num": "ESNJW-IHVKW"
+      },
+      "item": {
+        "name": "Callaway Flix Lite Pouch Pack",
+        "description": "Our small imprinted MicroFiber Valuables Pouch containing two custom one logo Callaway Warbird Golf Balls, 10 plain 2-3/4\" golf tees and a Flix Lite Divot Tool with custom resin domed removable ball marker. Available in step and repeat for additional charge. Optional second pole logo available for an additional charge.  4 1/4\" W x 5 7/8\" H",
+        "description_short": null,
+        "categories": [
+          "Pouches, Golf Kits"
+        ],
+        "themes": [
+          "Golf",
+          " Sports"
+        ],
+        "materials": [],
+        "colors": [
+          "Pouch White",
+          "Tee White",
+          "Tee Orange",
+          "Tee Black",
+          "Tee Natural",
+          "Tee Red",
+          "Tee Dark Green",
+          "Tee Dark Blue",
+          "Tee Yellow",
+          "Teen Neon Green",
+          "Tee Hot Pink",
+          "Golf Ball White",
+          "Tool Red",
+          "Tool Neon Orange",
+          "Tool Black",
+          "Tool Dark Blue",
+          "Tool Lime Green"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "4 1/4\" W x 5 7/8\" H"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Typhoon Golf",
+        "website": "www.typhoongolf.com",
+        "asi": null,
+        "sage_id": "69768",
+        "contact_name": null,
+        "email": "saige@typhoongolf.com",
+        "phone": "630.945.1171",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Villa Park",
+          "state": "IL",
+          "postal_code": "60181",
+          "country": null
+        },
+        "line_name": "Typhoon Golf",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 24,
+            "sell_price": 27.24,
+            "net_cost": 16.35,
+            "catalog_price": 27.24,
+            "margin": 10.89,
+            "margin_percent": 39.98,
+            "notes": null
+          },
+          {
+            "quantity": 48,
+            "sell_price": 26.96,
+            "net_cost": 16.18,
+            "catalog_price": 26.96,
+            "margin": 10.78,
+            "margin_percent": 39.99,
+            "notes": null
+          },
+          {
+            "quantity": 144,
+            "sell_price": 26.26,
+            "net_cost": 15.76,
+            "catalog_price": 26.26,
+            "margin": 10.5,
+            "margin_percent": 39.98,
+            "notes": null
+          },
+          {
+            "quantity": 288,
+            "sell_price": 25.97,
+            "net_cost": 15.59,
+            "catalog_price": 25.97,
+            "margin": 10.38,
+            "margin_percent": 39.97,
+            "notes": null
+          }
+        ],
+        "price_code": "RRRR",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "4 color process",
+        "notes": null
+      },
+      "fees": [],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Sublimation, 4 Process w/ Resin Dome, Direct Print",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Sublimation, 4 Process w/ Resin Dome, Direct Print.  2 1/8\" W x 2 1/2\" H; Center on Pouch imprint area.  7/8\" Diameter; Golf Balls & Tool second imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "60181",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "60181",
+            "country": null
+          }
+        ],
+        "units_per_carton": 24,
+        "weight_per_carton": 8.0,
+        "carton_dimensions": null,
+        "packaging": "Bulk.  24 units per carton.  8 lbs. per carton.  Normal production time is 10 working days.  Rush service production time (additional charge) is 3-5 working days.",
+        "lead_time": "Approximately 10 working days or 3 to 5 working days for rush service",
+        "rush_available": null,
+        "additional_charges_text": "Pouch w/Step&Repeat or 2 Logo:  2nd Imprint Adder (+1.80) (P)\r\n2nd Pole Logo:  2 Ball Adder (+1.32) (P)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734675&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734675&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Bulk.  24 units per carton.  8 lbs. per carton.  Normal production time is 10 working days.  Rush service production time (additional charge) is 3-5 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Pouch w/Step&Repeat or 2 Logo:  2nd Imprint Adder (+1.80) (P)\r\n2nd Pole Logo:  2 Ball Adder (+1.32) (P)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "MPB-FXPRO2-B",
+        "vendor_sku": "MPB-FXPRO2-B",
+        "cpn": null,
+        "spc": "ETVCR-GDNVW",
+        "prod_id": 7618037,
+        "encrypted_prod_id": "557618037",
+        "pres_item_id": 55734676,
+        "internal_item_num": "MPB-FXPRO2-B",
+        "item_num": "ETVCR-GDNVW"
+      },
+      "item": {
+        "name": "Mini Presentation Box Flix Pro 2.0",
+        "description": "This direct print Mini presentation box includes three tournament Golf Balls with one pole logo, and a Flix Pro 2.0 divot tool that comes with a full custom resin dome removable ball marker. Optional second pole logo available for an additional charge. If you would like a specific golf ball brand, please contact us for a quote. Item size:.  6.125\" L x 5.25\" W x 1.875\" H",
+        "description_short": null,
+        "categories": [
+          "Balls, Golf Tools"
+        ],
+        "themes": [
+          "Golf",
+          " Sports",
+          " Trade Show"
+        ],
+        "materials": [],
+        "colors": [
+          "Titanium",
+          "Black",
+          "Blue",
+          "White",
+          "Red",
+          "Orange",
+          "Copper",
+          "Yellow",
+          "Dark Green",
+          "Lime Green"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "6.125\" L x 5.25\" W x 1.875\" H"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Typhoon Golf",
+        "website": "www.typhoongolf.com",
+        "asi": null,
+        "sage_id": "69768",
+        "contact_name": null,
+        "email": "saige@typhoongolf.com",
+        "phone": "630.945.1171",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Villa Park",
+          "state": "IL",
+          "postal_code": "60181",
+          "country": null
+        },
+        "line_name": "Typhoon Golf",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 48,
+            "sell_price": 24.92,
+            "net_cost": 14.96,
+            "catalog_price": 24.92,
+            "margin": 9.96,
+            "margin_percent": 39.97,
+            "notes": null
+          },
+          {
+            "quantity": 144,
+            "sell_price": 24.35,
+            "net_cost": 14.61,
+            "catalog_price": 24.35,
+            "margin": 9.74,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 288,
+            "sell_price": 23.76,
+            "net_cost": 14.26,
+            "catalog_price": 23.76,
+            "margin": 9.5,
+            "margin_percent": 39.98,
+            "notes": null
+          }
+        ],
+        "price_code": "RRR",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "4 color process",
+        "notes": null
+      },
+      "fees": [],
+      "decoration": {
+        "methods": [
+          {
+            "name": "4-color process with resin dome & Direct Print",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "4-color process with resin dome & Direct Print.  7/8\" Diameter; Ball Marker & Golf Ball imprint area.  1.75\" H x 3\" W; Box second imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "60181",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "60181",
+            "country": null
+          }
+        ],
+        "units_per_carton": 24,
+        "weight_per_carton": 18.0,
+        "carton_dimensions": null,
+        "packaging": "Bulk.  24 units per carton.  18 lbs. per carton.  Carton dimensions 16\"x14\"x8\".  Normal production time is 7-10 working days.  Rush service production time (additional charge) is 3-5 working days.",
+        "lead_time": "7 to 10 working days or 3 to 5 working days for rush service",
+        "rush_available": null,
+        "additional_charges_text": "RUSH:  5 Day (20%), 3 Day (30%)\r\n// OPTIONS:  Golf Ball 2nd Pole Imprint (+2.25) (V)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734676&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734676&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Bulk.  24 units per carton.  18 lbs. per carton.  Carton dimensions 16\"x14\"x8\".  Normal production time is 7-10 working days.  Rush service production time (additional charge) is 3-5 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "RUSH:  5 Day (20%), 3 Day (30%)\r\n// OPTIONS:  Golf Ball 2nd Pole Imprint (+2.25) (V)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "MPB-FXPRO2-TWL",
+        "vendor_sku": "MPB-FXPRO2-TWL",
+        "cpn": null,
+        "spc": "LGQVR-DKQPS",
+        "prod_id": 7621063,
+        "encrypted_prod_id": "337621063",
+        "pres_item_id": 55734677,
+        "internal_item_num": "MPB-FXPRO2-TWL",
+        "item_num": "LGQVR-DKQPS"
+      },
+      "item": {
+        "name": "Dormie Towel Mini Presentation Box Flix Pro 2.0",
+        "description": "This direct print Dormie Towel Mini presentation Box a custom imprint heat transferred dye sub Dormie Towel (16\"x19\") , and a Flix Pro 2.0 divot tool that comes with a full custom resin dome removable ball marker. Item size:.  6.125\" L x 5.25\" W x 1.875\" H",
+        "description_short": null,
+        "categories": [
+          "Balls, Golf Tools"
+        ],
+        "themes": [
+          "Golf",
+          " Sports",
+          " Trade Show"
+        ],
+        "materials": [],
+        "colors": [
+          "Titanium",
+          "Black",
+          "Blue",
+          "White",
+          "Red",
+          "Orange",
+          "Copper",
+          "Yellow",
+          "Dark Green",
+          "Lime Green"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "16\"x19\""
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Typhoon Golf",
+        "website": "www.typhoongolf.com",
+        "asi": null,
+        "sage_id": "69768",
+        "contact_name": null,
+        "email": "saige@typhoongolf.com",
+        "phone": "630.945.1171",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Villa Park",
+          "state": "IL",
+          "postal_code": "60181",
+          "country": null
+        },
+        "line_name": "Typhoon Golf",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 24,
+            "sell_price": 27.58,
+            "net_cost": 16.55,
+            "catalog_price": 27.58,
+            "margin": 11.03,
+            "margin_percent": 39.99,
+            "notes": null
+          },
+          {
+            "quantity": 48,
+            "sell_price": 27.02,
+            "net_cost": 16.22,
+            "catalog_price": 27.02,
+            "margin": 10.8,
+            "margin_percent": 39.97,
+            "notes": null
+          },
+          {
+            "quantity": 144,
+            "sell_price": 26.44,
+            "net_cost": 15.87,
+            "catalog_price": 26.44,
+            "margin": 10.57,
+            "margin_percent": 39.98,
+            "notes": null
+          }
+        ],
+        "price_code": "RRR",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "4 color process",
+        "notes": null
+      },
+      "fees": [],
+      "decoration": {
+        "methods": [
+          {
+            "name": "4-color process with resin dome & Direct Print",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "4-color process with resin dome & Direct Print.  7/8\" Diameter; Ball Marker imprint area.  1.75\" H x 3\" W; Box & Towel second imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "60181",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "60181",
+            "country": null
+          }
+        ],
+        "units_per_carton": 24,
+        "weight_per_carton": 15.0,
+        "carton_dimensions": null,
+        "packaging": "Bulk.  24 units per carton.  15 lbs. per carton.  Carton dimensions 16\"x14\"x8\".  Normal production time is 7-10 working days.  Rush service production time (additional charge) is 3-5 working days.",
+        "lead_time": "7 to 10 working days or 3 to 5 working days for rush service",
+        "rush_available": null,
+        "additional_charges_text": "RUSH:  5 Day (20%), 3 Day (30%)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734677&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734677&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Bulk.  24 units per carton.  15 lbs. per carton.  Carton dimensions 16\"x14\"x8\".  Normal production time is 7-10 working days.  Rush service production time (additional charge) is 3-5 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "RUSH:  5 Day (20%), 3 Day (30%)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "K277",
+        "vendor_sku": "K277",
+        "cpn": null,
+        "spc": "LNJXX-FXSKV",
+        "prod_id": 4921646,
+        "encrypted_prod_id": "764921646",
+        "pres_item_id": 55734678,
+        "internal_item_num": "K277",
+        "item_num": "LNJXX-FXSKV"
+      },
+      "item": {
+        "name": "Stainless Credit Card Bottle Opener",
+        "description": "This flat, slim, credit card-sized bottle opener is the perfect accessory for anyone who enjoys cracking open a cold drink on the go. Made from brushed stainless steel, this sleek and durable tool is sure to impress. Its compact size makes it easy to slip into a wallet or pocket, ensuring that you always have a bottle opener handy when you need it. Whether you're at a party, picnic, or just relaxing at home, this credit card-sized bottle opener is a must-have tool for any beer lover.  2 1/8\" W x 3 1/4\" H",
+        "description_short": null,
+        "categories": [
+          "Openers"
+        ],
+        "themes": [
+          "Barware",
+          " Beverage",
+          " Drinking"
+        ],
+        "materials": [],
+        "colors": [
+          "Silver"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "2 1/8\" W x 3 1/4\" H"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "High Caliber Line",
+        "website": "www.highcaliberline.com",
+        "asi": null,
+        "sage_id": "64740",
+        "contact_name": null,
+        "email": "info@highcaliberline.com",
+        "phone": "800.707.2757",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Irwindale",
+          "state": "CA",
+          "postal_code": "91702",
+          "country": null
+        },
+        "line_name": "High Caliber Line USA/Calibre International",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 250,
+            "sell_price": 1.85,
+            "net_cost": 1.11,
+            "catalog_price": 1.85,
+            "margin": 0.74,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 500,
+            "sell_price": 1.79,
+            "net_cost": 1.08,
+            "catalog_price": 1.79,
+            "margin": 0.71,
+            "margin_percent": 39.66,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 1.74,
+            "net_cost": 1.05,
+            "catalog_price": 1.74,
+            "margin": 0.69,
+            "margin_percent": 39.66,
+            "notes": null
+          },
+          {
+            "quantity": 2500,
+            "sell_price": 1.69,
+            "net_cost": 1.02,
+            "catalog_price": 1.69,
+            "margin": 0.67,
+            "margin_percent": 39.64,
+            "notes": null
+          }
+        ],
+        "price_code": "RRRR",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "Laser engraving;1 side only",
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 60.0,
+          "net_cost": 60.0,
+          "price_code": "V",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "repeat",
+          "name": "Repeat/Reorder Charge",
+          "description": null,
+          "list_price": 30.0,
+          "net_cost": 30.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "proof",
+          "name": "Proof Charge",
+          "description": null,
+          "list_price": 12.0,
+          "net_cost": 12.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "pms",
+          "name": "PMS Color Match Charge",
+          "description": null,
+          "list_price": 37.5,
+          "net_cost": 37.5,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "sample",
+          "name": "Spec Sample Charge",
+          "description": null,
+          "list_price": 60.0,
+          "net_cost": 60.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "copy_change",
+          "name": "Copy Change Charge",
+          "description": null,
+          "list_price": 31.25,
+          "net_cost": 31.25,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Laser Engraved, Pad Printed",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Laser Engraved, Pad Printed.  1 7/8\" W x 1 7/8\" H; Front, Laser Engrave imprint area.  1 7/8\" W x 1 7/8\" H; (Optional - Pad)(4 Color Max) second imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "91702",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "91702",
+            "country": null
+          }
+        ],
+        "units_per_carton": 200,
+        "weight_per_carton": 22.0,
+        "carton_dimensions": null,
+        "packaging": "Bulk Packaging.  200 units per carton.  22 lbs. per carton.  Carton dimensions 8\"x6\"x5\".  Normal production time is 5 working days.",
+        "lead_time": "Approximately 5 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $60.00; Imprint:  Blank (250:1.55, 500:1.49, 1000:1.44, 2500:1.39), Standard (R)\r\nImprint:  Laser Engraving, Pad Printing (V)\r\nImprint:  Laser Engraved Personalization up to 2 Lines (per piece) (+1.30), Laser Engraved Personalization Each Additional Line (per piece) (+0.95) (V)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734678&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734678&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Bulk Packaging.  200 units per carton.  22 lbs. per carton.  Carton dimensions 8\"x6\"x5\".  Normal production time is 5 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $60.00; Imprint:  Blank (250:1.55, 500:1.49, 1000:1.44, 2500:1.39), Standard (R)\r\nImprint:  Laser Engraving, Pad Printing (V)\r\nImprint:  Laser Engraved Personalization up to 2 Lines (per piece) (+1.30), Laser Engraved Personalization Each Additional Line (per piece) (+0.95) (V)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "LG603",
+        "vendor_sku": "LG603",
+        "cpn": null,
+        "spc": "MQLCW-BQWYS",
+        "prod_id": 7510583,
+        "encrypted_prod_id": "937510583",
+        "pres_item_id": 55734679,
+        "internal_item_num": "LG603",
+        "item_num": "MQLCW-BQWYS"
+      },
+      "item": {
+        "name": "Versa Eco Friendly Tech Organizer Pouch",
+        "description": "300D recycled 2-tone Polyester pouch with PU Leeman brand patch on back. Store and protect your everyday essential accessories. Features five interior pockets to keep you fully organized including 2 mesh sectioned pockets. Exterior slash pocket on front. Zipper main compartment. PE foam padded lining for added protection.  7.9000\" W x 4.7000\" H x 2.6000\" D",
+        "description_short": null,
+        "categories": [
+          "Pouches"
+        ],
+        "themes": [],
+        "materials": [],
+        "colors": [
+          "Black Heather"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "7.9000\" W x 4.7000\" H x 2.6000\" D"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Prime Line®",
+        "website": "www.primeline.com",
+        "asi": null,
+        "sage_id": "53170",
+        "contact_name": null,
+        "email": "orders@primeline.com",
+        "phone": "877.858.9908",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Trevose",
+          "state": "PA",
+          "postal_code": "19053",
+          "country": null
+        },
+        "line_name": "Prime Line/Harriton (53170)/Columbia (53170)/CORE365/DRI DUCK (53170)/econscious (53170)/Game Time!®/Goofy Group™/Grosche® (53170)/Ice Shaker (53170)/Leeman™/MopTopper™/North End®/Oakley (53170)/Raref",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 50,
+            "sell_price": 12.99,
+            "net_cost": 7.8,
+            "catalog_price": 12.99,
+            "margin": 5.19,
+            "margin_percent": 39.95,
+            "notes": null
+          },
+          {
+            "quantity": 100,
+            "sell_price": 12.49,
+            "net_cost": 7.5,
+            "catalog_price": 12.49,
+            "margin": 4.99,
+            "margin_percent": 39.95,
+            "notes": null
+          },
+          {
+            "quantity": 300,
+            "sell_price": 11.99,
+            "net_cost": 7.2,
+            "catalog_price": 11.99,
+            "margin": 4.79,
+            "margin_percent": 39.95,
+            "notes": null
+          },
+          {
+            "quantity": 500,
+            "sell_price": 11.49,
+            "net_cost": 6.9,
+            "catalog_price": 11.49,
+            "margin": 4.59,
+            "margin_percent": 39.95,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 10.99,
+            "net_cost": 6.6,
+            "catalog_price": 10.99,
+            "margin": 4.39,
+            "margin_percent": 39.95,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": null,
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 27.5,
+          "net_cost": 27.5,
+          "price_code": "G",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "repeat",
+          "name": "Repeat/Reorder Charge",
+          "description": null,
+          "list_price": 27.5,
+          "net_cost": 27.5,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "pms",
+          "name": "PMS Color Match Charge",
+          "description": null,
+          "list_price": 40.0,
+          "net_cost": 40.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "sample",
+          "name": "Spec Sample Charge",
+          "description": null,
+          "list_price": 40.0,
+          "net_cost": 40.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "copy_change",
+          "name": "Copy Change Charge",
+          "description": null,
+          "list_price": 25.0,
+          "net_cost": 25.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Screen, 4cptransfer, Spotcolor",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Screen, 4cptransfer, Spotcolor.  5\" W x 1.5\" H; Centered on Front Pocket imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": null,
+        "fob_points": [],
+        "units_per_carton": null,
+        "weight_per_carton": null,
+        "carton_dimensions": null,
+        "packaging": "Bulk.",
+        "lead_time": "3 to 7 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $27.50; Colors:   (R)\r\nSizes:  OS (0.00) (R)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734679&picnum=0"
+      ],
+      "notes": {
+        "packaging": "Bulk.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $27.50; Colors:   (R)\r\nSizes:  OS (0.00) (R)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "LR11",
+        "vendor_sku": "LR11",
+        "cpn": null,
+        "spc": "MQJCS-GMRPQ",
+        "prod_id": 7120131,
+        "encrypted_prod_id": "967120131",
+        "pres_item_id": 55734680,
+        "internal_item_num": "LR11",
+        "item_num": "MQJCS-GMRPQ"
+      },
+      "item": {
+        "name": "Fuzzerator Lint Brush",
+        "description": "Polish your brand image with the Fuzzerator Lint Brush. This double-sided brush removes lint twice as fast. Hold the self-cleaning base with one hand and pull on the handle pull tab with your other hand to open it. Swipe the lint brush on the item you are cleaning in the opposite direction of the bristles on the lint brush. Push the lint brush down into the self-cleaning base to remove the lint. Repeat as necessary. The bottom base snaps out, allowing you to clean the inside.  2.25\" W x 5.312\" L x 3\" H",
+        "description_short": null,
+        "categories": [
+          "Lint Removers, Brushes"
+        ],
+        "themes": [
+          "Beauty",
+          " Fashion",
+          " Household",
+          " Travel"
+        ],
+        "materials": [],
+        "colors": [
+          "White/Gray"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "2.25\" W x 5.312\" L x 3\" H"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Mixie",
+        "website": "hpgbrands.com/mixie",
+        "asi": null,
+        "sage_id": "63952",
+        "contact_name": null,
+        "email": "mixie.info@hpgbrands.com",
+        "phone": "651.322.8200",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Eagan",
+          "state": "MN",
+          "postal_code": "55121",
+          "country": null
+        },
+        "line_name": "Webb Collection/Mixie",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 250,
+            "sell_price": 4.22,
+            "net_cost": 2.54,
+            "catalog_price": 4.22,
+            "margin": 1.68,
+            "margin_percent": 39.81,
+            "notes": null
+          },
+          {
+            "quantity": 500,
+            "sell_price": 3.86,
+            "net_cost": 2.32,
+            "catalog_price": 3.86,
+            "margin": 1.54,
+            "margin_percent": 39.9,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 3.78,
+            "net_cost": 2.27,
+            "catalog_price": 3.78,
+            "margin": 1.51,
+            "margin_percent": 39.95,
+            "notes": null
+          },
+          {
+            "quantity": 2500,
+            "sell_price": 3.69,
+            "net_cost": 2.22,
+            "catalog_price": 3.69,
+            "margin": 1.47,
+            "margin_percent": 39.84,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "1 Color;1 Location",
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 60.0,
+          "net_cost": 60.0,
+          "price_code": "G",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "pms",
+          "name": "PMS Color Match Charge",
+          "description": null,
+          "list_price": 50.0,
+          "net_cost": 50.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "copy_change",
+          "name": "Copy Change Charge",
+          "description": null,
+          "list_price": 60.0,
+          "net_cost": 60.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Pad Print",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Pad Print.  1.5\" W x 2\" H; Centered On Front imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "55121",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "55121",
+            "country": null
+          }
+        ],
+        "units_per_carton": 200,
+        "weight_per_carton": 40.0,
+        "carton_dimensions": null,
+        "packaging": "Custom Decorated Box.  200 units per carton.  40 lbs. per carton.  Carton dimensions 23\"x14\"x13\".  Normal production time is 3-5 working days.",
+        "lead_time": "3 to 5 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $60.00; Additional Color:  Additional Color Run (+0.35), Additional Color Set Up (+60.00) (G)\r\nImprint:  PMS Matching ($50.00G) (g)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734680&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734680&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Custom Decorated Box.  200 units per carton.  40 lbs. per carton.  Carton dimensions 23\"x14\"x13\".  Normal production time is 3-5 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $60.00; Additional Color:  Additional Color Run (+0.35), Additional Color Set Up (+60.00) (G)\r\nImprint:  PMS Matching ($50.00G) (g)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "VS1206",
+        "vendor_sku": "VS1206",
+        "cpn": null,
+        "spc": "HYHHT-JDNFY",
+        "prod_id": 8605209,
+        "encrypted_prod_id": "178605209",
+        "pres_item_id": 55734681,
+        "internal_item_num": "VS1206",
+        "item_num": "HYHHT-JDNFY"
+      },
+      "item": {
+        "name": "Gripa Alligator Fridge Memo / Chip Clip",
+        "description": "The Gripa Alligator Fridge Clip offers reliable, everyday functionality with a clean, simple design. Made from durable plastic, it features a translucent body for visibility and a textured grip for secure handling. The sturdy spring clip holds notes or papers on magnetic surfaces, while the strong clamp also functions as a chip clip to seal snack bags or food packages. Ideal for home or office use, it's a practical solution for basic organizing need or for help with keeping snacks fresh.  1 1/4\" W x 1 11/16\" H x 3 7/16\" D",
+        "description_short": null,
+        "categories": [
+          "Clips"
+        ],
+        "themes": [],
+        "materials": [],
+        "colors": [
+          "Black",
+          "Green",
+          "Blue",
+          "Purple",
+          "Red",
+          "Orange",
+          "White"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "1 1/4\" W x 1 11/16\" H x 3 7/16\" D"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Logomark Inc",
+        "website": "www.logomark.com",
+        "asi": null,
+        "sage_id": "50111",
+        "contact_name": null,
+        "email": "sales@logomark.com",
+        "phone": "800.789.4438",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Tustin",
+          "state": "CA",
+          "postal_code": "92780",
+          "country": null
+        },
+        "line_name": "Logomark/Basics/Essentials/Bettoni/Watch Creations/Ensemble/Jorg Gray/Valumark/Basics Plastik/Giftcor/Igloo (50111)",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 300,
+            "sell_price": 1.7,
+            "net_cost": 1.02,
+            "catalog_price": 1.7,
+            "margin": 0.68,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 1.55,
+            "net_cost": 0.93,
+            "catalog_price": 1.55,
+            "margin": 0.62,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 2500,
+            "sell_price": 1.4,
+            "net_cost": 0.84,
+            "catalog_price": 1.4,
+            "margin": 0.56,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 5000,
+            "sell_price": 1.25,
+            "net_cost": 0.75,
+            "catalog_price": 1.25,
+            "margin": 0.5,
+            "margin_percent": 40.0,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "1 color;1 side;1 location",
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 62.5,
+          "net_cost": 62.5,
+          "price_code": "G",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "repeat",
+          "name": "Repeat/Reorder Charge",
+          "description": null,
+          "list_price": 30.0,
+          "net_cost": 30.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Screen Printing",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Screen Printing.  1 1/8\" L x 1/2\" H; Top imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "92780",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "92780",
+            "country": null
+          }
+        ],
+        "units_per_carton": 300,
+        "weight_per_carton": 24.0,
+        "carton_dimensions": null,
+        "packaging": "Basics Bulk Shipment.  300 units per carton.  24 lbs. per carton.  Carton dimensions 14\"x10\"x10\".  Normal production time is 5-7 working days.",
+        "lead_time": "5 to 7 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $62.50; Imprint:  ColorSplash (+0.45) (G)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734681&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734681&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Basics Bulk Shipment.  300 units per carton.  24 lbs. per carton.  Carton dimensions 14\"x10\"x10\".  Normal production time is 5-7 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $62.50; Imprint:  ColorSplash (+0.45) (G)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "NEOKCB4CP",
+        "vendor_sku": "NEOKCB4CP",
+        "cpn": null,
+        "spc": "HLXPW-HMRCU",
+        "prod_id": 6625525,
+        "encrypted_prod_id": "736625525",
+        "pres_item_id": 55734682,
+        "internal_item_num": "NEOKCB4CP",
+        "item_num": "HLXPW-HMRCU"
+      },
+      "item": {
+        "name": "Full Color Neoprene Wristband with Bottle Opener",
+        "description": "This full-color neoprene wristband & bottle opener is a multifunction promo dream. The comfortable neoprene wristband keyring clip is great for your keys & doubles as a bottle opener. Clip it to your bag, belt loop, or wear it as a wristband. Your brand will stay top of mind with this everyday product. Material: Neoprene and Metal.  1\" W x 7.5\" L",
+        "description_short": null,
+        "categories": [
+          "Wristbands, Key Chains / Rings"
+        ],
+        "themes": [
+          "Exercise",
+          " Travel",
+          " Drinking",
+          " Trade Show",
+          " Vacation"
+        ],
+        "materials": [],
+        "colors": [
+          "Various"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "1\" W x 7.5\" L"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Best Promotions USA LLC",
+        "website": "hpgbrands.com/best",
+        "asi": null,
+        "sage_id": "68218",
+        "contact_name": null,
+        "email": "best.orders@hpgbrands.com",
+        "phone": "972.552.3636",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Sunnyvale",
+          "state": "TX",
+          "postal_code": "75182",
+          "country": null
+        },
+        "line_name": "Best/Cooler Kings/Cooler Graphics",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 100,
+            "sell_price": 3.84,
+            "net_cost": 2.31,
+            "catalog_price": 3.84,
+            "margin": 1.53,
+            "margin_percent": 39.84,
+            "notes": null
+          },
+          {
+            "quantity": 250,
+            "sell_price": 3.53,
+            "net_cost": 2.12,
+            "catalog_price": 3.53,
+            "margin": 1.41,
+            "margin_percent": 39.94,
+            "notes": null
+          },
+          {
+            "quantity": 500,
+            "sell_price": 3.21,
+            "net_cost": 1.93,
+            "catalog_price": 3.21,
+            "margin": 1.28,
+            "margin_percent": 39.88,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 2.9,
+            "net_cost": 1.74,
+            "catalog_price": 2.9,
+            "margin": 1.16,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 2500,
+            "sell_price": 2.59,
+            "net_cost": 1.56,
+            "catalog_price": 2.59,
+            "margin": 1.03,
+            "margin_percent": 39.77,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "Full Color;1 location",
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 45.0,
+          "net_cost": 45.0,
+          "price_code": "G",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "proof",
+          "name": "Proof Charge",
+          "description": null,
+          "list_price": 10.0,
+          "net_cost": 10.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "pms",
+          "name": "PMS Color Match Charge",
+          "description": null,
+          "list_price": 40.0,
+          "net_cost": 40.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "copy_change",
+          "name": "Copy Change Charge",
+          "description": null,
+          "list_price": 16.0,
+          "net_cost": 16.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Dye Sublimation",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Dye Sublimation.  0.75\" W x 3.5\" H; Front & Back imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "75182",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "75182",
+            "country": null
+          }
+        ],
+        "units_per_carton": 500,
+        "weight_per_carton": 26.0,
+        "carton_dimensions": null,
+        "packaging": "Bulk.  500 units per carton.  26 lbs. per carton.  Carton dimensions 18\"x17\"x8\".  Normal production time is 5-7 working days.",
+        "lead_time": "5 to 7 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $45.00",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734682&picnum=0"
+      ],
+      "notes": {
+        "packaging": "Bulk.  500 units per carton.  26 lbs. per carton.  Carton dimensions 18\"x17\"x8\".  Normal production time is 5-7 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $45.00",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "75610",
+        "vendor_sku": "75610",
+        "cpn": null,
+        "spc": "DQLGV-EZHRW",
+        "prod_id": 7549457,
+        "encrypted_prod_id": "317549457",
+        "pres_item_id": 55734683,
+        "internal_item_num": "75610",
+        "item_num": "DQLGV-EZHRW"
+      },
+      "item": {
+        "name": "TerraTone™ 3-In-1 Charging Cable",
+        "description": "Introducing the TerraTone 3-in-1 charging cable, a sleek solution for your devices. Part of our eco-friendly TerraTone line, it minimizes environmental impact without sacrificing quality or sound. Versatile & durable, this cable ensures seamless charging for all your gadgets as it comes equipped with adapters for micro USB, 8-pin style, & USB-C.  47\" L x 47\" L",
+        "description_short": null,
+        "categories": [
+          "Cables"
+        ],
+        "themes": [
+          "College",
+          " Household",
+          " Office",
+          " Travel"
+        ],
+        "materials": [],
+        "colors": [
+          "White-Brown"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "47\" L x 47\" L"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": "Environmentally Friendly",
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Origaudio",
+        "website": "hpgbrands.com/origaudio",
+        "asi": null,
+        "sage_id": "69075",
+        "contact_name": null,
+        "email": "hsp.promomail@hpgbrands.com",
+        "phone": "801.727.1400",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Balch Springs",
+          "state": "TX",
+          "postal_code": "75180",
+          "country": null
+        },
+        "line_name": "Origaudio",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 1,
+            "sell_price": 17.12,
+            "net_cost": 10.28,
+            "catalog_price": 17.12,
+            "margin": 6.84,
+            "margin_percent": 39.95,
+            "notes": null
+          },
+          {
+            "quantity": 10,
+            "sell_price": 13.7,
+            "net_cost": 8.22,
+            "catalog_price": 13.7,
+            "margin": 5.48,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 25,
+            "sell_price": 13.38,
+            "net_cost": 8.03,
+            "catalog_price": 13.38,
+            "margin": 5.35,
+            "margin_percent": 39.99,
+            "notes": null
+          },
+          {
+            "quantity": 50,
+            "sell_price": 13.08,
+            "net_cost": 7.85,
+            "catalog_price": 13.08,
+            "margin": 5.23,
+            "margin_percent": 39.98,
+            "notes": null
+          },
+          {
+            "quantity": 100,
+            "sell_price": 12.45,
+            "net_cost": 7.47,
+            "catalog_price": 12.45,
+            "margin": 4.98,
+            "margin_percent": 40.0,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "Full color",
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "copy_change",
+          "name": "Copy Change Charge",
+          "description": null,
+          "list_price": 2.75,
+          "net_cost": 2.75,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Laser engraved",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Laser engraved.  0.75\" Diameter; Button Front & Back imprint area.  0.75\" Diameter; Button Front & Back second imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "75182",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "75182",
+            "country": null
+          }
+        ],
+        "units_per_carton": null,
+        "weight_per_carton": null,
+        "carton_dimensions": null,
+        "packaging": "Retail Style Packaging.  Normal production time is 5 working days.",
+        "lead_time": "Approximately 5 working days",
+        "rush_available": null,
+        "additional_charges_text": null,
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734683&picnum=0"
+      ],
+      "notes": {
+        "packaging": "Retail Style Packaging.  Normal production time is 5 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": null,
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "SR02CB",
+        "vendor_sku": "SR02CB",
+        "cpn": null,
+        "spc": "ILNXT-APKZW",
+        "prod_id": 7534297,
+        "encrypted_prod_id": "187534297",
+        "pres_item_id": 55734684,
+        "internal_item_num": "SR02CB",
+        "item_num": "ILNXT-APKZW"
+      },
+      "item": {
+        "name": "Confetti Stress Ball",
+        "description": "Brand with a twinkle in your squeeze. The Confetti Stress Ball Reliever offers a unique & visually appealing squeeze toy experience by creating a gentle & celebratory visual effect. When the stress ball is squeezed or manipulated, the smaller, multi-colored water beads & shimmering gold glitter inside interact to produce a confetti-like display, evoking the sense of a delicate burst of colors & sparkle. 100% Non-Toxic, BPA Free, and Odorless.  2.25\" Diameter x 2.25\" Diameter",
+        "description_short": null,
+        "categories": [
+          "Squeeze Toys"
+        ],
+        "themes": [
+          "Fitness",
+          " Fun",
+          " Health",
+          " Office"
+        ],
+        "materials": [],
+        "colors": [
+          "Multi-Colored",
+          "Blue"
+        ],
+        "primary_color": null,
+        "dimensions": null,
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Mixie",
+        "website": "hpgbrands.com/mixie",
+        "asi": null,
+        "sage_id": "63952",
+        "contact_name": null,
+        "email": "mixie.info@hpgbrands.com",
+        "phone": "651.322.8200",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Eagan",
+          "state": "MN",
+          "postal_code": "55121",
+          "country": null
+        },
+        "line_name": "Webb Collection/Mixie",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 100,
+            "sell_price": 4.14,
+            "net_cost": 2.49,
+            "catalog_price": 4.14,
+            "margin": 1.65,
+            "margin_percent": 39.86,
+            "notes": null
+          },
+          {
+            "quantity": 250,
+            "sell_price": 3.8,
+            "net_cost": 2.28,
+            "catalog_price": 3.8,
+            "margin": 1.52,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 500,
+            "sell_price": 3.71,
+            "net_cost": 2.23,
+            "catalog_price": 3.71,
+            "margin": 1.48,
+            "margin_percent": 39.89,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 3.62,
+            "net_cost": 2.18,
+            "catalog_price": 3.62,
+            "margin": 1.44,
+            "margin_percent": 39.78,
+            "notes": null
+          },
+          {
+            "quantity": 2500,
+            "sell_price": 3.45,
+            "net_cost": 2.07,
+            "catalog_price": 3.45,
+            "margin": 1.38,
+            "margin_percent": 40.0,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "1 Color;1 Location",
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 60.0,
+          "net_cost": 60.0,
+          "price_code": "G",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "pms",
+          "name": "PMS Color Match Charge",
+          "description": null,
+          "list_price": 50.0,
+          "net_cost": 50.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "copy_change",
+          "name": "Copy Change Charge",
+          "description": null,
+          "list_price": 60.0,
+          "net_cost": 60.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Pad Print",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Pad Print.  1.25\" Diameter; Front imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "55121",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "55121",
+            "country": null
+          }
+        ],
+        "units_per_carton": 125,
+        "weight_per_carton": 31.0,
+        "carton_dimensions": null,
+        "packaging": "Window Box.  125 units per carton.  31 lbs. per carton.  Carton dimensions 14\"x14\"x14\".  Normal production time is 5 working days.",
+        "lead_time": "Approximately 5 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $60.00",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734684&picnum=0"
+      ],
+      "notes": {
+        "packaging": "Window Box.  125 units per carton.  31 lbs. per carton.  Carton dimensions 14\"x14\"x14\".  Normal production time is 5 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $60.00",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "WOF-TG10",
+        "vendor_sku": "WOF-TG10",
+        "cpn": null,
+        "spc": "KXDYR-HNSJU",
+        "prod_id": 3392025,
+        "encrypted_prod_id": "353392025",
+        "pres_item_id": 55734685,
+        "internal_item_num": "WOF-TG10",
+        "item_num": "KXDYR-HNSJU"
+      },
+      "item": {
+        "name": "Think Green Recycled Notepad & Pen",
+        "description": "Think Green with this Recycled Notepad and Pen that is made from partially recycled materials. Has a color match ball point pen, with black ink and recycle barrel, and 50 sheets (100 pages) in a spiral bound rulec memo pad.  3.3125\" W x 5.375\" H",
+        "description_short": null,
+        "categories": [
+          "Notebooks"
+        ],
+        "themes": [
+          "College",
+          " Office",
+          " Writing",
+          " Entertainment",
+          " Convention"
+        ],
+        "materials": [],
+        "colors": [
+          "Black",
+          "Blue",
+          "Green",
+          "Red"
+        ],
+        "primary_color": null,
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": "3.3125\" W x 5.375\" H"
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Ariel Premium Supply Inc",
+        "website": "www.arielpremium.com",
+        "asi": null,
+        "sage_id": "60462",
+        "contact_name": null,
+        "email": "customerservice@arielpremium.com",
+        "phone": "800.270.7474",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "St Louis",
+          "state": "MO",
+          "postal_code": "63114",
+          "country": null
+        },
+        "line_name": "Ariel Line/Lin Line",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 150,
+            "sell_price": 2.32,
+            "net_cost": 1.4,
+            "catalog_price": 2.32,
+            "margin": 0.92,
+            "margin_percent": 39.66,
+            "notes": null
+          },
+          {
+            "quantity": 500,
+            "sell_price": 2.2,
+            "net_cost": 1.32,
+            "catalog_price": 2.2,
+            "margin": 0.88,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 2.11,
+            "net_cost": 1.27,
+            "catalog_price": 2.11,
+            "margin": 0.84,
+            "margin_percent": 39.81,
+            "notes": null
+          },
+          {
+            "quantity": 2500,
+            "sell_price": 2.02,
+            "net_cost": 1.22,
+            "catalog_price": 2.02,
+            "margin": 0.8,
+            "margin_percent": 39.6,
+            "notes": null
+          },
+          {
+            "quantity": 5000,
+            "sell_price": 1.95,
+            "net_cost": 1.17,
+            "catalog_price": 1.95,
+            "margin": 0.78,
+            "margin_percent": 40.0,
+            "notes": null
+          }
+        ],
+        "price_code": "CCCCC",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "1 color;1 side;1 location",
+        "notes": null
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Setup Charge",
+          "description": null,
+          "list_price": 60.0,
+          "net_cost": 60.0,
+          "price_code": "G",
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "repeat",
+          "name": "Repeat/Reorder Charge",
+          "description": null,
+          "list_price": 25.0,
+          "net_cost": 25.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        },
+        {
+          "fee_type": "pms",
+          "name": "PMS Color Match Charge",
+          "description": null,
+          "list_price": 55.0,
+          "net_cost": 55.0,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": null,
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Screen, Pad",
+            "full_color": false,
+            "max_colors": null,
+            "notes": null
+          }
+        ],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": "Screen, Pad.  2.25\" W x 2.25\" H; Front imprint area.  2.75\" W x 0.2\" H; Pen second imprint area.",
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "63114",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "63114",
+            "country": null
+          }
+        ],
+        "units_per_carton": 150,
+        "weight_per_carton": 21.0,
+        "carton_dimensions": null,
+        "packaging": "Bulk.  150 units per carton.  21 lbs. per carton.  Carton dimensions 14\"x14\"x9\".  Normal production time is 5-7 working days.",
+        "lead_time": "5 to 7 working days",
+        "rush_available": null,
+        "additional_charges_text": "Setup: $60.00; Imprint:  Pad print: Per Additional Color (+0.30), Pad print: Imprint on Pen (+0.40) (G)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734685&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55734685&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Bulk.  150 units per carton.  21 lbs. per carton.  Carton dimensions 14\"x14\"x9\".  Normal production time is 5-7 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Setup: $60.00; Imprint:  Pad print: Per Additional Color (+0.30), Pad print: Imprint on Pen (+0.40) (G)",
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "CS-1",
+        "vendor_sku": "CS-1",
+        "cpn": null,
+        "spc": "ISZVT-CBSRT",
+        "prod_id": 7404274,
+        "encrypted_prod_id": "797404274",
+        "pres_item_id": 55735144,
+        "internal_item_num": "CS-1",
+        "item_num": "ISZVT-CBSRT"
+      },
+      "item": {
+        "name": "Unisex Knitted Dress Sock",
+        "description": "Our dress socks combine style and comfort for a polished professional look. Made from soft cotton and durable nylon, they're perfect for meetings or presentations. Fully customizable in classic solids or bold patterns, they keep you confident all day.",
+        "description_short": null,
+        "categories": [
+          "Socks"
+        ],
+        "themes": [
+          "Education",
+          " Fashion",
+          " Office"
+        ],
+        "materials": [],
+        "colors": [
+          "Various"
+        ],
+        "primary_color": null,
+        "dimensions": null,
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "Sock101",
+        "website": "www.sock101.com",
+        "asi": null,
+        "sage_id": "50144",
+        "contact_name": null,
+        "email": "custom@sock101.com",
+        "phone": "855.376.2566",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Lee's Summit",
+          "state": "MO",
+          "postal_code": "64086",
+          "country": null
+        },
+        "line_name": "Sock101",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 50,
+            "sell_price": 16.8,
+            "net_cost": 10.08,
+            "catalog_price": 16.8,
+            "margin": 6.72,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 100,
+            "sell_price": 12.61,
+            "net_cost": 7.57,
+            "catalog_price": 12.61,
+            "margin": 5.04,
+            "margin_percent": 39.97,
+            "notes": null
+          },
+          {
+            "quantity": 250,
+            "sell_price": 9.45,
+            "net_cost": 5.67,
+            "catalog_price": 9.45,
+            "margin": 3.78,
+            "margin_percent": 40.0,
+            "notes": null
+          },
+          {
+            "quantity": 500,
+            "sell_price": 7.04,
+            "net_cost": 4.23,
+            "catalog_price": 7.04,
+            "margin": 2.81,
+            "margin_percent": 39.91,
+            "notes": null
+          },
+          {
+            "quantity": 1000,
+            "sell_price": 6.39,
+            "net_cost": 3.84,
+            "catalog_price": 6.39,
+            "margin": 2.55,
+            "margin_percent": 39.91,
+            "notes": null
+          },
+          {
+            "quantity": 2500,
+            "sell_price": 6.12,
+            "net_cost": 3.68,
+            "catalog_price": 6.12,
+            "margin": 2.44,
+            "margin_percent": 39.87,
+            "notes": null
+          }
+        ],
+        "price_code": "RRRRRR",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "Full color",
+        "notes": null
+      },
+      "fees": [],
+      "decoration": {
+        "methods": [],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": null,
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "64086",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "64086",
+            "country": null
+          }
+        ],
+        "units_per_carton": null,
+        "weight_per_carton": null,
+        "carton_dimensions": null,
+        "packaging": "Bulk.  Normal production time is 21-28 working days.  Rush service production time (additional charge) is 14-21 working days.",
+        "lead_time": "21 to 28 working days or 14 to 21 working days for rush service",
+        "rush_available": null,
+        "additional_charges_text": null,
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55735144&picnum=0",
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55735144&picnum=1"
+      ],
+      "notes": {
+        "packaging": "Bulk.  Normal production time is 21-28 working days.  Rush service production time (additional charge) is 14-21 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": null,
+        "other": null
+      },
+      "flags": {}
+    },
+    {
+      "source": "sage",
+      "identifiers": {
+        "mpn": "PC330",
+        "vendor_sku": "PC330",
+        "cpn": null,
+        "spc": "GWVLR-JRKSP",
+        "prod_id": 6446000,
+        "encrypted_prod_id": "546446000",
+        "pres_item_id": 55735145,
+        "internal_item_num": "PC330",
+        "item_num": "GWVLR-JRKSP"
+      },
+      "item": {
+        "name": "Port & Co™ Tri-Blend Tee.",
+        "description": "Primed for 24/7 comfort, a proprietary finish gives our tri-blend tee unbelievable softness at a great value.",
+        "description_short": null,
+        "categories": [
+          "Shirts"
+        ],
+        "themes": [
+          "Clothing"
+        ],
+        "materials": [],
+        "colors": [
+          "Black",
+          "Black Heather",
+          "Bright Red Heather",
+          "Carolina Blue Heather",
+          "Coal Gray",
+          "Coyote Brown Heather",
+          "Deep Navy Blue",
+          "Deep Orange Heather",
+          "Forest Green Heather",
+          "Graphite Heather Gray",
+          "Heather Jadeite Green",
+          "Heather Royal Blue",
+          "Heather Dusty Peach Pink",
+          "Military Green Heather",
+          "Ochre Yellow Heather",
+          "Raspberry Heather Pink",
+          "Steel Blue Heather",
+          "Team Navy Blue Heather",
+          "Team Purple Heather",
+          "Vivid Teal Blue Heather",
+          "White"
+        ],
+        "primary_color": null,
+        "dimensions": null,
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "SanMar",
+        "website": "www.sanmar.com",
+        "asi": null,
+        "sage_id": "50042",
+        "contact_name": null,
+        "email": "sales@sanmar.com",
+        "phone": "800.426.6399",
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": "Seattle",
+          "state": "WA",
+          "postal_code": "98124",
+          "country": null
+        },
+        "line_name": "CornerStone/District/Eddie Bauer/Gildan (50042)/Hanes (50042)/Jerzees (50042)/New Era Cap (50042)/Nike (50042)/Nike Golf/North Face (50042)/OGIO/Port Authority/Port & Company/Rabbit Skins by LAT Appar",
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 1,
+            "sell_price": 10.26,
+            "net_cost": 5.13,
+            "catalog_price": 10.26,
+            "margin": 5.13,
+            "margin_percent": 50.0,
+            "notes": null
+          },
+          {
+            "quantity": 72,
+            "sell_price": 8.26,
+            "net_cost": 4.13,
+            "catalog_price": 8.26,
+            "margin": 4.13,
+            "margin_percent": 50.0,
+            "notes": null
+          }
+        ],
+        "price_code": "AA",
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": "Blank",
+        "notes": null
+      },
+      "fees": [],
+      "decoration": {
+        "methods": [],
+        "locations": [],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": null,
+        "imprint_colors_description": null,
+        "multi_color_description": null
+      },
+      "variants": [],
+      "shipping": {
+        "ship_point": "98029",
+        "fob_points": [
+          {
+            "city": null,
+            "state": null,
+            "postal_code": "98029",
+            "country": null
+          }
+        ],
+        "units_per_carton": null,
+        "weight_per_carton": null,
+        "carton_dimensions": null,
+        "packaging": "Bulk.  Normal production time is 1 working days.",
+        "lead_time": "Approximately 1 working days",
+        "rush_available": null,
+        "additional_charges_text": "Size:  Small (1:10.26, 72:8.26), Medium (1:10.26, 72:8.26), Large (1:10.26, 72:8.26), X-Large (1:10.26, 72:8.26), 2X-Large (1:12.32, 72:10.32), 3X-Large (1:13.36, 72:11.36), 4X-Large (1:16.46, 72:14.46) (AA)",
+        "supplier_disclaimers": []
+      },
+      "images": [
+        "https://www.promoplace.com/ws/ws.dll/connect-pres-pic?acctid=270178&presid=7679185&type=1&presitemid=55735145&picnum=0"
+      ],
+      "notes": {
+        "packaging": "Bulk.  Normal production time is 1 working days.",
+        "lead_time": null,
+        "supplier_disclaimers": [],
+        "additional_charges_text": "Size:  Small (1:10.26, 72:8.26), Medium (1:10.26, 72:8.26), Large (1:10.26, 72:8.26), X-Large (1:10.26, 72:8.26), 2X-Large (1:12.32, 72:10.32), 3X-Large (1:13.36, 72:11.36), 4X-Large (1:16.46, 72:14.46) (AA)",
+        "other": null
+      },
+      "flags": {}
+    }
+  ],
+  "errors": [],
+  "zoho_integration": {
+    "sku_format": "[ClientAccountNumber]-[VendorSKU]",
+    "mpn_source": "vendor_sku or mpn field",
+    "vendor_match_key": "vendor.website",
+    "track_inventory": false,
+    "default_unit": "Piece",
+    "taxable": true
+  },
+  "zoho_upload_result": {
+    "success": true,
+    "total_products": 14,
+    "successful_uploads": 14,
+    "failed_uploads": 0,
+    "duration_seconds": 68.513649,
+    "errors": []
+  }
+}

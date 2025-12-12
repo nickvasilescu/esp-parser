@@ -141,8 +141,8 @@ AGENT_TOOLS = [
                 },
                 "include_fees": {
                     "type": "boolean",
-                    "description": "Create separate items for fees (setup, rush, etc). Default: true",
-                    "default": True
+                    "description": "Create separate items for fees (setup, rush, etc). Default: false",
+                    "default": False
                 }
             },
             "required": ["product_index", "client_account_number"]
@@ -448,7 +448,7 @@ class ZohoItemMasterAgent:
         product_index = tool_input.get("product_index")
         client_account_number = tool_input.get("client_account_number")
         include_variations = tool_input.get("include_variations", False)
-        include_fees = tool_input.get("include_fees", True)
+        include_fees = tool_input.get("include_fees", False)
         
         if self._unified_output is None:
             return json.dumps({"error": "No unified output loaded"})
@@ -489,6 +489,9 @@ class ZohoItemMasterAgent:
             logger.info(f"Product '{product_name}': {len(variations)} variation(s)")
             
             # === STEP 2: Create items for each variation ===
+            # Get presentation URL from metadata for custom fields
+            presentation_url = self._unified_output.get("metadata", {}).get("presentation_url")
+
             created_items = []
             for variation in variations:
                 payload = build_item_payload(
@@ -496,7 +499,8 @@ class ZohoItemMasterAgent:
                     client_account_number=client_account_number,
                     discovered_fields=self._discovered_fields,
                     variation=variation if variation else None,
-                    category_id=category_id
+                    category_id=category_id,
+                    presentation_url=presentation_url
                 )
                 
                 # Extract and remove metadata

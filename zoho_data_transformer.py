@@ -14,12 +14,90 @@ Key Functions:
 
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from zoho_config import ZOHO_ITEM_DEFAULTS, CUSTOM_FIELD_PATTERNS
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Category Classification
+# =============================================================================
+
+# Keywords that indicate each category type (will be matched as whole words)
+APPAREL_KEYWORDS = [
+    "apparel", "clothing", "shirt", "shirts", "t-shirt", "tshirt", "polo", "polos",
+    "jacket", "jackets", "hoodie", "hoodies", "sweatshirt", "fleece", "vest",
+    "cap", "caps", "hats", "beanie", "headwear", "pants", "shorts", "dress",
+    "blouse", "uniform", "uniforms", "workwear", "activewear", "sportswear",
+    "jersey", "jerseys", "sweater", "coat", "coats", "outerwear", "apron",
+    "scrubs", "footwear", "shoes", "socks", "sandals", "boots", "gloves",
+    "scarf", "scarves", "neckties", "embroidered", "screen printed"
+]
+
+PRINT_KEYWORDS = [
+    "printing", "stationery", "paper", "notebook", "notebooks", "notepad",
+    "journal", "journals", "calendar", "calendars", "planner", "letterhead",
+    "envelope", "envelopes", "business cards", "brochure", "brochures",
+    "flyer", "flyers", "poster", "posters", "banner", "banners", "signage",
+    "decal", "decals", "sticker", "stickers", "labels", "folder", "folders",
+    "binder", "binders", "booklet", "catalog", "magazine", "postcard",
+    "invitation", "invitations", "memo pad"
+]
+
+# Everything else defaults to "Promo"
+
+def classify_product_category(
+    product: Dict[str, Any]
+) -> str:
+    """
+    Classify a product into one of three categories: Promo, Print, or Apparel.
+
+    Uses product name, description, and ESP/SAGE categories to determine
+    the best fit. Uses word boundary matching to avoid false positives.
+
+    Args:
+        product: Unified product dictionary
+
+    Returns:
+        One of: "Promo", "Print", "Apparel"
+    """
+    # Gather text to analyze
+    item = product.get("item", {})
+    name = (item.get("name") or "").lower()
+    description = (item.get("description") or "").lower()
+    categories = item.get("categories", [])
+
+    # Combine categories into searchable text
+    if isinstance(categories, list):
+        category_text = " ".join(categories).lower()
+    else:
+        category_text = str(categories).lower()
+
+    # Combine all text for searching
+    search_text = f"{name} {description} {category_text}"
+
+    # Check for Apparel first (most specific) - use word boundaries
+    for keyword in APPAREL_KEYWORDS:
+        # Use word boundary regex to avoid matching "hat" in "what"
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, search_text):
+            logger.debug(f"Category: Apparel (matched '{keyword}')")
+            return "Apparel"
+
+    # Check for Print - use word boundaries
+    for keyword in PRINT_KEYWORDS:
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, search_text):
+            logger.debug(f"Category: Print (matched '{keyword}')")
+            return "Print"
+
+    # Default to Promo (promotional products - drinkware, bags, tech, etc.)
+    logger.debug("Category: Promo (default)")
+    return "Promo"
 
 
 # =============================================================================
@@ -614,38 +692,39 @@ def format_price_grid(breaks: List[Dict[str, Any]], price_field: str = "sell_pri
 def map_custom_fields(
     product: Dict[str, Any],
     discovered_fields: Dict[str, Optional[str]],
-    client_info: Optional[Dict[str, Any]] = None
+    client_info: Optional[Dict[str, Any]] = None,
+    presentation_url: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Map unified product data to Zoho custom fields.
-    
+    Map unified product data to Zoho custom fields (Koell's field labels).
+
     This is the "fail-safe" mechanism - only populates fields
     that were discovered to exist in Zoho.
-    
+
     Args:
         product: Unified product dictionary
         discovered_fields: Dict mapping field names to custom field IDs
                           (from ZohoClient.discover_custom_fields)
         client_info: Optional client context for additional fields
-        
+
     Returns:
         List of custom field objects for Zoho API
     """
     custom_fields = []
-    
-    identifiers = product.get("identifiers", {})
+
+    # Extract nested data
     item = product.get("item", {})
     vendor = product.get("vendor", {})
-    pricing = product.get("pricing", {})
+    decoration = product.get("decoration", {})
     shipping = product.get("shipping", {})
     notes = product.get("notes", {})
-    decoration = product.get("decoration", {})
-    
-    # Helper to add field if discovered
+    metadata = product.get("metadata", {})
+
+    # Helper to add field if discovered (retain JSON handling)
     def add_field(field_name: str, value: Any):
         field_id = discovered_fields.get(field_name)
         if field_id and value is not None:
-            # Convert complex types to string
+            # Convert complex types to JSON string
             if isinstance(value, (dict, list)):
                 value = json.dumps(value)
             custom_fields.append({
@@ -653,58 +732,221 @@ def map_custom_fields(
                 "value": str(value) if value else ""
             })
             logger.debug(f"Mapped custom field '{field_name}' = {str(value)[:50]}...")
-    
-    # Lead time
-    lead_time = shipping.get("lead_time") or notes.get("lead_time")
-    add_field("lead_time", lead_time)
-    
-    # Colors
+
+    # === Color Fields ===
+    # Color Options (multi-line, all available colors)
     colors = item.get("colors", [])
     if colors:
-        add_field("colors_available", ", ".join(colors) if isinstance(colors, list) else colors)
-    add_field("imprint_colors", decoration.get("imprint_colors_description"))
-    
-    # Packaging
-    add_field("packaging", shipping.get("packaging") or notes.get("packaging"))
-    
-    # Ship point
-    ship_point = shipping.get("ship_point")
-    if not ship_point and shipping.get("fob_points"):
-        fob = shipping["fob_points"][0]
-        ship_point = fob.get("postal_code") or fob.get("city")
-    add_field("ship_point", ship_point)
-    
-    # Price grids (raw data for Quote/Calculator)
-    breaks = pricing.get("breaks", [])
-    if breaks:
-        sell_grid = format_price_grid(breaks, "sell_price")
-        cost_grid = format_price_grid(breaks, "net_cost")
-        add_field("sell_price_grid", sell_grid)
-        add_field("cost_price_grid", cost_grid)
-    
-    # Source/Provenance
-    add_field("source_platform", product.get("source"))
-    
-    # Identifiers
-    add_field("cpn", identifiers.get("cpn"))
-    add_field("spc", identifiers.get("spc"))
-    add_field("prod_id", identifiers.get("prod_id"))
-    
-    # Fees (as JSON blob)
-    fees = product.get("fees", [])
-    if fees:
-        add_field("fee_data", fees)
-    
-    # Categories (raw)
+        color_text = "\n".join(colors) if isinstance(colors, list) else str(colors)
+        add_field("color_options", color_text)
+
+    # Color Ordered (selected color - may be empty initially)
+    add_field("color_ordered", item.get("primary_color"))
+
+    # Imprint Color
+    add_field("imprint_color", decoration.get("imprint_colors_description"))
+
+    # === Decoration Fields ===
+    # Decoration Options (combine methods + imprint info for comprehensive view)
+    deco_parts = []
+
+    # Methods (from ESP structure or SAGE)
+    deco_methods = []
+    for method in decoration.get("methods", []):
+        if isinstance(method, dict):
+            deco_methods.append(method.get("name", ""))
+        else:
+            deco_methods.append(str(method))
+    if deco_methods:
+        deco_parts.append("Methods: " + ", ".join(deco_methods))
+
+    # Imprint info (includes sizes/locations from ESP, or raw info from SAGE)
+    imprint_info = decoration.get("imprint_info")
+    if imprint_info:
+        deco_parts.append(imprint_info)
+
+    if deco_parts:
+        add_field("decoration_options", "\n".join(deco_parts))
+
+    # Decoration Method (selected - use first method from methods array)
+    selected_method = decoration.get("selected_method")
+    if not selected_method:
+        # Use first method from methods array (populated by normalizer from decoration_method field)
+        methods = decoration.get("methods", [])
+        if methods:
+            first_method = methods[0]
+            selected_method = first_method.get("name") if isinstance(first_method, dict) else str(first_method)
+    add_field("decoration_method", selected_method)
+
+    # === Production Fields ===
+    # Lead Time
+    lead_time = shipping.get("lead_time") or notes.get("lead_time")
+    add_field("lead_time", lead_time)
+
+    # Setup Info (setup fee details + price includes as text)
+    setup_parts = []
+
+    # Setup fees
+    setup_fees = [f for f in product.get("fees", []) if f.get("fee_type") == "setup"]
+    if setup_fees:
+        for f in setup_fees:
+            name = f.get("name", "Setup")
+            price = f.get("list_price")
+            if price:
+                setup_parts.append(f"{name}: ${price:.2f}")
+            else:
+                setup_parts.append(f"{name}: TBD")
+
+    # Price Includes (e.g., "One color fill" from ESP)
+    pricing = product.get("pricing", {})
+    price_includes = pricing.get("price_includes") or notes.get("price_includes")
+    if price_includes:
+        setup_parts.append(f"Price Includes: {price_includes}")
+
+    if setup_parts:
+        add_field("setup_info", "\n".join(setup_parts))
+
+    # === Source/Provenance Fields ===
+    # Info Source (ESP or SAGE)
+    source = product.get("source", "").upper()
+    if source:
+        add_field("info_source", source)
+
+    # Presentation Link (prefer passed URL, then check product metadata)
+    pres_url = presentation_url or metadata.get("presentation_url") or product.get("presentation_url")
+    add_field("presentation_link", pres_url)
+
+    # === Category Fields (two separate custom fields in Zoho) ===
+    # 1. "Promo Category" text field → detailed ESP/SAGE category like "Beverages- Wine/champagne/liquor"
     categories = item.get("categories", [])
     if categories:
-        add_field("categories_raw", ", ".join(categories) if isinstance(categories, list) else categories)
-    
-    # Margin from first break
-    if breaks:
-        first_break = sorted(breaks, key=lambda b: b.get("quantity", 0))[0] if breaks else {}
-        add_field("margin_percent", first_break.get("margin_percent"))
-    
+        detailed_cat = categories[0] if isinstance(categories, list) else categories
+        add_field("promo_category", detailed_cat)
+
+    # 2. "Category" dropdown → "Promo", "Print", or "Apparel" (classified from product data)
+    product_category = classify_product_category(product)
+    add_field("product_category", product_category)
+
+    # === Sustainability Fields ===
+    add_field("sustainability_credential", item.get("sustainability_credential"))
+
+    recycled = item.get("recycled_content")
+    if recycled is not None:
+        # Percent field expects number
+        add_field("recycled_content", recycled)
+
+    # === Other Fields ===
+    add_field("buying_group", vendor.get("buying_group"))
+
+    # Mfg Description (full manufacturer description)
+    add_field("mfg_description", item.get("description"))
+
+    # Materials (primarily from ESP)
+    materials = item.get("materials", [])
+    if materials:
+        materials_text = ", ".join(materials) if isinstance(materials, list) else str(materials)
+        add_field("materials", materials_text)
+
+    # Themes (primarily from SAGE, e.g., "Clothing, Drinking, Golf")
+    themes = item.get("themes", [])
+    if themes:
+        themes_text = ", ".join(themes) if isinstance(themes, list) else str(themes)
+        add_field("themes", themes_text)
+
+    # === Dimensions & Weight ===
+    dimensions = item.get("dimensions", {})
+    if dimensions:
+        dim_parts = []
+        if dimensions.get("length"):
+            dim_parts.append(f"L: {dimensions['length']}")
+        if dimensions.get("width"):
+            dim_parts.append(f"W: {dimensions['width']}")
+        if dimensions.get("height"):
+            dim_parts.append(f"H: {dimensions['height']}")
+        if dimensions.get("diameter"):
+            dim_parts.append(f"Dia: {dimensions['diameter']}")
+        unit = dimensions.get("unit", "")
+        if dim_parts:
+            dim_text = " x ".join(dim_parts)
+            if unit:
+                dim_text += f" {unit}"
+            add_field("dimensions", dim_text)
+
+    # Weight
+    if item.get("weight_value"):
+        weight_text = f"{item['weight_value']} {item.get('weight_unit', '')}".strip()
+        add_field("weight", weight_text)
+
+    # === Shipping Details ===
+    ship_point = shipping.get("ship_point")
+    if not ship_point:
+        fob_points = shipping.get("fob_points", [])
+        if fob_points and isinstance(fob_points[0], dict):
+            ship_point = ", ".join(filter(None, [fob_points[0].get("city"), fob_points[0].get("state")]))
+    add_field("ship_point", ship_point)
+
+    add_field("units_per_carton", shipping.get("units_per_carton"))
+
+    if shipping.get("weight_per_carton"):
+        add_field("carton_weight", f"{shipping['weight_per_carton']} lbs")
+
+    add_field("packaging", shipping.get("packaging"))
+
+    if shipping.get("rush_available") is not None:
+        add_field("rush_available", "Yes" if shipping["rush_available"] else "No")
+
+    # === Vendor Contact Info ===
+    add_field("vendor_contact", vendor.get("contact_name"))
+    add_field("vendor_email", vendor.get("email"))
+    add_field("vendor_phone", vendor.get("phone"))
+
+    # Vendor Address (formatted)
+    vendor_addr = vendor.get("address", {})
+    if vendor_addr:
+        addr_parts = [vendor_addr.get("line1"), vendor_addr.get("line2")]
+        city_state = ", ".join(filter(None, [vendor_addr.get("city"), vendor_addr.get("state")]))
+        if city_state:
+            addr_parts.append(city_state)
+        if vendor_addr.get("postal_code"):
+            addr_parts.append(vendor_addr["postal_code"])
+        addr_text = "\n".join(filter(None, addr_parts))
+        if addr_text:
+            add_field("vendor_address", addr_text)
+
+    # SAGE-specific relationship fields
+    add_field("vendor_account_num", vendor.get("my_customer_number"))
+    if vendor.get("my_cs_rep"):
+        cs_info = vendor["my_cs_rep"]
+        if vendor.get("my_cs_rep_email"):
+            cs_info += f" ({vendor['my_cs_rep_email']})"
+        add_field("vendor_cs_rep", cs_info)
+
+    # === Industry IDs ===
+    add_field("asi_number", vendor.get("asi"))
+    add_field("sage_id", vendor.get("sage_id"))
+
+    # === Pricing ===
+    # Price Valid Through
+    add_field("price_valid_through", pricing.get("valid_through"))
+
+    # === Variants Summary ===
+    variants = product.get("variants", [])
+    if variants:
+        variant_parts = []
+        for v in variants:
+            attr = v.get("attribute", "")
+            options = v.get("options", [])
+            if attr and options:
+                opts_text = ", ".join(options) if isinstance(options, list) else str(options)
+                variant_parts.append(f"{attr.title()}: {opts_text}")
+        if variant_parts:
+            add_field("variants", "\n".join(variant_parts))
+
+    # === Product Images ===
+    images = product.get("images", [])
+    if images:
+        add_field("product_images", images[0] if len(images) == 1 else json.dumps(images))
+
     return custom_fields
 
 
@@ -743,7 +985,8 @@ def build_item_payload(
     discovered_fields: Dict[str, Optional[str]],
     variation: Optional[Dict[str, str]] = None,
     category_id: Optional[str] = None,
-    inventory_note: Optional[str] = None
+    inventory_note: Optional[str] = None,
+    presentation_url: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Build the complete Zoho Item API payload.
@@ -818,10 +1061,14 @@ def build_item_payload(
     if mpn:
         payload["part_number"] = mpn
     
-    # Add category if provided
+    # Add category if provided (this is for Zoho Item Groups, not our custom dropdown)
     if category_id:
         payload["category_id"] = category_id
-    
+
+    # NOTE: The "Category" dropdown (Promo/Print/Apparel) is a CUSTOM FIELD in Zoho,
+    # not a standard API field. It's set in map_custom_fields() via "product_category".
+    # Zoho's Items API does not have a "category_name" field.
+
     # Add default tax ID if configured
     if ZOHO_ITEM_DEFAULTS.get("tax_id"):
         payload["tax_id"] = ZOHO_ITEM_DEFAULTS["tax_id"]
@@ -831,9 +1078,26 @@ def build_item_payload(
         payload["manufacturer"] = vendor["name"]
     if vendor.get("line_name"):
         payload["brand"] = vendor["line_name"]
-    
+
+    # Purchase Description - Vendor-facing specs (appears on POs)
+    purchase_desc_parts = []
+    dimensions = item.get("dimensions", {})
+    if dimensions and dimensions.get("raw"):
+        purchase_desc_parts.append(f"Dimensions: {dimensions['raw']}")
+    shipping = product.get("shipping", {})
+    if shipping.get("units_per_carton"):
+        purchase_desc_parts.append(f"Units/Carton: {shipping['units_per_carton']}")
+    if shipping.get("weight_per_carton"):
+        purchase_desc_parts.append(f"Carton Wt: {shipping['weight_per_carton']} lbs")
+    if shipping.get("packaging"):
+        purchase_desc_parts.append(f"Packaging: {shipping['packaging']}")
+    if vendor.get("my_customer_number"):
+        purchase_desc_parts.append(f"Our Acct #: {vendor['my_customer_number']}")
+    if purchase_desc_parts:
+        payload["purchase_description"] = "\n".join(purchase_desc_parts)
+
     # Map custom fields
-    custom_fields = map_custom_fields(product, discovered_fields)
+    custom_fields = map_custom_fields(product, discovered_fields, presentation_url=presentation_url)
     if custom_fields:
         payload["custom_fields"] = custom_fields
     

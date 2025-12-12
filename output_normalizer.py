@@ -200,12 +200,18 @@ def _normalize_esp_product(product: Dict[str, Any]) -> UnifiedProduct:
             notes=brk.get("notes")
         ))
     
+    # Get price_includes - check pricing first, then presentation_sell_data for ESP
+    price_includes = pricing_data.get("price_includes")
+    if not price_includes:
+        pres_data = product.get("presentation_sell_data", {})
+        price_includes = pres_data.get("price_includes")
+
     pricing = UnifiedPricing(
         breaks=price_breaks,
         price_code=pricing_data.get("price_code"),
         currency=pricing_data.get("currency", "USD"),
         valid_through=pricing_data.get("valid_through"),
-        price_includes=None,  # Part of notes in ESP
+        price_includes=price_includes,  # e.g., "One color fill"
         notes=pricing_data.get("notes")
     )
     
@@ -253,12 +259,21 @@ def _normalize_esp_product(product: Dict[str, Any]) -> UnifiedProduct:
         ))
     
     multi_color = decoration_data.get("multi_color_options", {})
+
+    # Build imprint_info from ESP-specific fields (imprint_sizes, imprint_locations)
+    imprint_info_parts = []
+    if product.get("imprint_sizes"):
+        imprint_info_parts.append(f"Size: {product.get('imprint_sizes')}")
+    if product.get("imprint_locations"):
+        imprint_info_parts.append(f"Location: {product.get('imprint_locations')}")
+
     decoration = UnifiedDecoration(
         methods=methods,
         locations=locations,
         sold_unimprinted=decoration_data.get("sold_unimprinted"),
         personalization_available=decoration_data.get("personalization_available"),
         full_color_process_available=decoration_data.get("full_color_process_available"),
+        imprint_info="\n".join(imprint_info_parts) if imprint_info_parts else None,
         imprint_colors_description=decoration_data.get("imprint_colors_description"),
         multi_color_description=multi_color.get("description") if multi_color else None
     )
@@ -328,10 +343,11 @@ def _normalize_sage(data: Dict[str, Any]) -> UnifiedOutput:
     metadata = data.get("metadata", {})
     
     # Build unified metadata
+    # SAGE stores presentation_url in metadata, not at top level
     unified_metadata = UnifiedMetadata(
         generated_at=metadata.get("generated_at", datetime.now().isoformat()),
         source="sage",
-        presentation_url=data.get("presentation_url", ""),
+        presentation_url=metadata.get("presentation_url") or data.get("presentation_url", ""),
         presentation_title=metadata.get("presentation_title"),
         presentation_date=metadata.get("presentation_date"),
         pres_id=data.get("pres_id"),
@@ -417,13 +433,25 @@ def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
     # Item - SAGE has fields at top level
     category = item_data.get("category") or product.get("category")
     categories = [category] if category else []
-    
+
+    # Themes from Full Product Detail API
+    themes_str = item_data.get("themes") or product.get("themes")
+    themes = themes_str.split(",") if themes_str else []
+
+    # Build sustainability credential from flags (check both nested and product-level)
+    sustainability_parts = []
+    if item_data.get("recyclable") or product.get("recyclable"):
+        sustainability_parts.append("Recyclable")
+    if item_data.get("env_friendly") or product.get("env_friendly"):
+        sustainability_parts.append("Environmentally Friendly")
+    sustainability_credential = ", ".join(sustainability_parts) if sustainability_parts else None
+
     item = UnifiedItem(
         name=item_data.get("name") or product.get("name", ""),
         description=item_data.get("description") or product.get("description", ""),
         description_short=None,  # SAGE doesn't have short description
         categories=categories,
-        themes=[],  # SAGE doesn't have themes
+        themes=themes,  # Now populated from Full Product Detail API
         materials=[],  # SAGE doesn't have materials
         colors=item_data.get("colors") or product.get("colors", []),
         primary_color=None,  # SAGE doesn't have primary color
@@ -431,7 +459,8 @@ def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
             raw=item_data.get("dimensions") or product.get("dimensions")
         ) if (item_data.get("dimensions") or product.get("dimensions")) else None,
         weight_value=None,
-        weight_unit=None
+        weight_unit=None,
+        sustainability_credential=sustainability_credential  # From recyclable/envFriendly flags
     )
     
     # Vendor - SAGE uses "supplier" at top level
@@ -480,9 +509,9 @@ def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
     
     pricing = UnifiedPricing(
         breaks=price_breaks,
-        price_code=pricing_data.get("price_code"),
+        price_code=pricing_data.get("price_code") or product.get("price_code"),
         currency="USD",
-        price_includes=pricing_data.get("price_includes")
+        price_includes=pricing_data.get("price_includes") or product.get("price_includes")
     )
     
     # Fees - SAGE has individual fee fields, not a fees[] array
@@ -520,34 +549,63 @@ def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
             price_code=fee.get("price_code")
         ))
     
-    # Decoration - SAGE has simple imprint_info string
-    imprint_info = decoration_data.get("imprint_info")
+    # Decoration - SAGE has imprint_info_text at product level (not in decoration dict)
+    # Also check decoration.imprint_info as fallback
+    imprint_info = product.get("imprint_info_text") or decoration_data.get("imprint_info")
+
+    # Build decoration methods from Full Product Detail API (check both nested and product-level)
+    decoration_methods = []
+    deco_method = decoration_data.get("decoration_method") or product.get("decoration_method")
+    if deco_method:
+        decoration_methods.append(UnifiedDecorationMethod(name=deco_method))
+
+    # Build imprint areas from Full Product Detail API
+    imprint_areas = []
+    imprint_area = decoration_data.get("imprint_area")
+    imprint_loc = decoration_data.get("imprint_loc")
+    if imprint_area:
+        imprint_areas.append(f"{imprint_loc}: {imprint_area}" if imprint_loc else imprint_area)
+    second_area = decoration_data.get("second_imprint_area")
+    second_loc = decoration_data.get("second_imprint_loc")
+    if second_area:
+        imprint_areas.append(f"{second_loc}: {second_area}" if second_loc else second_area)
+
     decoration = UnifiedDecoration(
-        imprint_info=imprint_info
+        methods=decoration_methods,
+        imprint_info=imprint_info,
+        # Store imprint areas in multi_color_description field (or we could add a new field)
+        multi_color_description="\n".join(imprint_areas) if imprint_areas else None
     )
-    
-    # Shipping
-    ship_point = shipping_data.get("ship_point")
+
+    # Shipping - check both nested shipping_data and product-level flat fields
+    ship_point = shipping_data.get("ship_point") or product.get("ship_point")
     fob_points = []
     if ship_point:
         # Ship point is typically a zip code
         fob_points.append(UnifiedFOBPoint(postal_code=ship_point))
-    
-    # Parse lead time from packaging string
-    packaging = shipping_data.get("packaging", "")
-    lead_time = None
-    if "production time" in packaging.lower():
-        # Try to extract lead time from packaging string
-        lead_time = packaging  # Keep full string for now
-    
+
+    # Lead Time - prefer nested, fallback to product.prod_time (SAGE field name)
+    lead_time = shipping_data.get("lead_time") or product.get("prod_time")
+
+    # Packaging - SAGE uses packaging_text at product level
+    packaging = shipping_data.get("packaging") or product.get("packaging_text", "")
+
+    # If still no lead_time, try parsing from packaging string
+    if not lead_time and packaging and "production time" in packaging.lower():
+        lead_time = packaging
+
     # Get additional_charges_text for both shipping and notes
     additional_charges_text = product.get("additional_charges_text", "")
-    
+
+    # Units and weight per carton - check both nested and product-level
+    units_per_carton = shipping_data.get("units_per_carton") or product.get("units_per_carton")
+    weight_per_carton = shipping_data.get("weight_per_carton") or product.get("weight_per_carton")
+
     shipping = UnifiedShipping(
         ship_point=ship_point,
         fob_points=fob_points,
-        units_per_carton=shipping_data.get("units_per_carton"),
-        weight_per_carton=shipping_data.get("weight_per_carton"),
+        units_per_carton=units_per_carton,
+        weight_per_carton=weight_per_carton,
         packaging=packaging,
         lead_time=lead_time,
         additional_charges_text=additional_charges_text  # For fee parser
@@ -559,8 +617,8 @@ def _normalize_sage_product(product: Dict[str, Any]) -> UnifiedProduct:
         additional_charges_text=additional_charges_text
     )
     
-    # Images
-    images = product.get("images", [])
+    # Images - SAGE uses image_urls at product level
+    images = product.get("images", []) or product.get("image_urls", [])
     
     return UnifiedProduct(
         source="sage",

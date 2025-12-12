@@ -1,0 +1,340 @@
+{
+  "success": true,
+  "metadata": {
+    "generated_at": "2025-12-11T18:32:43.733603",
+    "source": "esp",
+    "presentation_url": "https://portal.mypromooffice.com/projects/500187876/presentations/500183020/products",
+    "presentation_title": null,
+    "presentation_date": null,
+    "pres_id": null,
+    "total_items": 1,
+    "items_processed": 1,
+    "errors": 0,
+    "api_version": null,
+    "pricing_sources": {
+      "sell_price": "From ESP Presentation - client-facing price",
+      "net_cost": "From ESP Distributor Report - authoritative cost",
+      "catalog_price": "MSRP/List price from catalog"
+    }
+  },
+  "client": {
+    "id": null,
+    "name": null,
+    "company": null,
+    "email": null,
+    "phone": null,
+    "tax_rate": null
+  },
+  "presenter": {
+    "name": null,
+    "company": "STBL Strategies",
+    "phone": null,
+    "email": null,
+    "website": null
+  },
+  "products": [
+    {
+      "source": "esp",
+      "identifiers": {
+        "mpn": "CPN-564949909",
+        "vendor_sku": "CPN-564949909",
+        "cpn": "564949909",
+        "spc": null,
+        "prod_id": null,
+        "encrypted_prod_id": null,
+        "pres_item_id": null,
+        "internal_item_num": null,
+        "item_num": null
+      },
+      "item": {
+        "name": "Etched Pinot Noir Red Wine Bottle",
+        "description": "Mark a big milestone with this 750ml California pinot noir bottle. This item uses deep hand etching and optional hand-painted color fills, exemplifying superior craftsmanship. With a 5-star rating maintained, each bottle is carefully hand-crafted by artisans. Price includes one color fill.",
+        "description_short": "750ml California pinot noir bottle with deep hand etching and optional hand-painted color fills.",
+        "categories": [
+          "Wine Bottles",
+          "Etched Wine",
+          "Corporate Gifts"
+        ],
+        "themes": [
+          "Corporate Gifting",
+          "Employee Recognition",
+          "Milestones",
+          "Holidays"
+        ],
+        "materials": [
+          "Glass"
+        ],
+        "colors": [
+          "Red"
+        ],
+        "primary_color": "Red",
+        "dimensions": {
+          "length": null,
+          "width": null,
+          "height": null,
+          "diameter": null,
+          "unit": null,
+          "raw": null
+        },
+        "weight_value": null,
+        "weight_unit": null,
+        "sustainability_credential": null,
+        "recycled_content": null,
+        "item_assembled": null
+      },
+      "vendor": {
+        "name": "STBL Strategies",
+        "website": "stblstrategies.com",
+        "asi": null,
+        "sage_id": null,
+        "contact_name": null,
+        "email": null,
+        "phone": null,
+        "address": {
+          "line1": null,
+          "line2": null,
+          "city": null,
+          "state": null,
+          "postal_code": null,
+          "country": null
+        },
+        "line_name": null,
+        "trade_name": null,
+        "hours": null,
+        "my_customer_number": null,
+        "my_cs_rep": null,
+        "my_cs_rep_email": null
+      },
+      "pricing": {
+        "breaks": [
+          {
+            "quantity": 12,
+            "sell_price": 75.16,
+            "net_cost": null,
+            "catalog_price": 75.16,
+            "margin": null,
+            "margin_percent": null,
+            "notes": null
+          },
+          {
+            "quantity": 48,
+            "sell_price": 69.0,
+            "net_cost": null,
+            "catalog_price": 69.0,
+            "margin": null,
+            "margin_percent": null,
+            "notes": null
+          },
+          {
+            "quantity": 108,
+            "sell_price": 64.42,
+            "net_cost": null,
+            "catalog_price": 64.42,
+            "margin": null,
+            "margin_percent": null,
+            "notes": null
+          },
+          {
+            "quantity": 204,
+            "sell_price": 61.12,
+            "net_cost": null,
+            "catalog_price": 61.12,
+            "margin": null,
+            "margin_percent": null,
+            "notes": null
+          },
+          {
+            "quantity": 300,
+            "sell_price": 58.8,
+            "net_cost": null,
+            "catalog_price": 58.8,
+            "margin": null,
+            "margin_percent": null,
+            "notes": null
+          }
+        ],
+        "price_code": null,
+        "currency": "USD",
+        "valid_through": null,
+        "price_includes": null,
+        "notes": "Price Includes: One color fill"
+      },
+      "fees": [
+        {
+          "fee_type": "setup",
+          "name": "Set-up Charge",
+          "description": "Deep Etch",
+          "list_price": 156.25,
+          "net_cost": null,
+          "price_code": null,
+          "charge_basis": "per_order",
+          "min_qty": null,
+          "decoration_method": "Deep Etch",
+          "notes": null
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "Imprint Option Charge",
+          "description": "750ml 1 Color",
+          "list_price": null,
+          "net_cost": null,
+          "price_code": null,
+          "charge_basis": "qur",
+          "min_qty": null,
+          "decoration_method": "Deep Etch",
+          "notes": "QUR"
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "Imprint Option Charge",
+          "description": "750ml 2 Color",
+          "list_price": 10.0,
+          "net_cost": null,
+          "price_code": null,
+          "charge_basis": "per_unit",
+          "min_qty": null,
+          "decoration_method": "Deep Etch",
+          "notes": null
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "Imprint Option Charge",
+          "description": "Hand-painted Color Fill",
+          "list_price": null,
+          "net_cost": null,
+          "price_code": null,
+          "charge_basis": "qur",
+          "min_qty": null,
+          "decoration_method": "Hand-Painted",
+          "notes": "QUR"
+        },
+        {
+          "fee_type": "additional_color",
+          "name": "Imprint Option Charge",
+          "description": "750ml 3 Color",
+          "list_price": 20.0,
+          "net_cost": null,
+          "price_code": null,
+          "charge_basis": "per_unit",
+          "min_qty": null,
+          "decoration_method": "Deep Etch",
+          "notes": null
+        }
+      ],
+      "decoration": {
+        "methods": [
+          {
+            "name": "Deep Etch",
+            "full_color": false,
+            "max_colors": 3,
+            "notes": "Deep hand etching with optional hand-painted color fills"
+          }
+        ],
+        "locations": [
+          {
+            "name": "Bottle",
+            "component": "product",
+            "methods_allowed": [
+              "Deep Etch"
+            ],
+            "imprint_areas": [
+              {
+                "width": 3.0,
+                "height": 4.0,
+                "diameter": null,
+                "unit": "in",
+                "raw": "3\" x 4\""
+              }
+            ]
+          }
+        ],
+        "sold_unimprinted": null,
+        "personalization_available": null,
+        "full_color_process_available": null,
+        "imprint_info": null,
+        "imprint_colors_description": null,
+        "multi_color_description": "Additional imprint colors available (2 color for $10.00, 3 color for $20.00); hand-painted color fills available QUR"
+      },
+      "variants": [
+        {
+          "attribute": "color",
+          "label": "Colors",
+          "component": "product",
+          "options": [
+            "Red"
+          ],
+          "notes": null
+        },
+        {
+          "attribute": "size",
+          "label": "Sizes",
+          "component": "product",
+          "options": [
+            "750 ml"
+          ],
+          "notes": null
+        }
+      ],
+      "shipping": {
+        "ship_point": null,
+        "fob_points": [
+          {
+            "city": null,
+            "state": "California",
+            "postal_code": null,
+            "country": "USA"
+          }
+        ],
+        "units_per_carton": null,
+        "weight_per_carton": null,
+        "carton_dimensions": null,
+        "packaging": null,
+        "lead_time": "Production Time: 5 business days",
+        "rush_available": null,
+        "additional_charges_text": null,
+        "supplier_disclaimers": []
+      },
+      "images": [],
+      "notes": {
+        "packaging": null,
+        "lead_time": "Production Time: 5 business days",
+        "supplier_disclaimers": [],
+        "additional_charges_text": null,
+        "other": "This PDF contains multiple etched wine bottle products. The first product (Etched Pinot Noir Red Wine Bottle CPN-564949909) has been extracted. Additional products include: Etched Chardonnay White Wine Bottle, Etched Cabernet Sauvignon Red Wine Bottle, Etched Jordan Cabernet Alexander Valley, Etched Duckhorn Decoy Cabernet, Etched Coppola Diamond Cabernet, Etched Robert Mondavi Private Select Cabernet, Etched Cakebread Cabernet, Etched Far Niente Cabernet, Etched Charles Krug Cabernet Napa, Etched Stag's Leap Cellars Artemis Cabernet, Etched The Prisoner Red Blend, Etched Far Niente Chardonnay, Etched Taittinger Brut La Francaise Champagne, Etched Yatir Mt. Amasa Kosher White Wine, Etched Franciscan Napa Chardonnay, Etched Duckhorn Decoy Chardonnay, Etched Robert Mondavi Napa Valley Chardonnay, Laser-Engraved Wood Box gift sets, Etched Beringer Knight's Valley Cabernet, and Etched Flowers Rose Wine Bottle."
+      },
+      "flags": {
+        "source_format": "STBL Strategies PDF",
+        "has_kit_components": false,
+        "ocr_quality": null
+      }
+    }
+  ],
+  "errors": [],
+  "zoho_integration": {
+    "sku_format": "[ClientAccountNumber]-[VendorSKU]",
+    "mpn_source": "vendor_sku or mpn field",
+    "vendor_match_key": "vendor.website",
+    "track_inventory": false,
+    "default_unit": "Piece",
+    "taxable": true
+  },
+  "zoho_upload_result": {
+    "success": true,
+    "total_products": 1,
+    "successful_uploads": 1,
+    "failed_uploads": 0,
+    "duration_seconds": 27.678688,
+    "errors": []
+  },
+  "zoho_quote_result": {
+    "success": false,
+    "estimate_id": null,
+    "estimate_number": null,
+    "customer_id": null,
+    "customer_name": null,
+    "total_amount": null,
+    "line_items_count": 0,
+    "duration_seconds": 17.127866,
+    "error": "Agent did not complete quote creation"
+  }
+}

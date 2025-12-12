@@ -1,0 +1,53 @@
+{
+  "success": true,
+  "metadata": {
+    "generated_at": "2025-12-11T17:05:35.457261",
+    "source": "esp",
+    "presentation_url": "https://portal.mypromooffice.com/projects/500187876/presentations/500183020/products",
+    "presentation_title": null,
+    "presentation_date": null,
+    "pres_id": null,
+    "total_items": 0,
+    "items_processed": 0,
+    "errors": 0,
+    "api_version": null,
+    "pricing_sources": {
+      "sell_price": "From ESP Presentation - client-facing price",
+      "net_cost": "From ESP Distributor Report - authoritative cost",
+      "catalog_price": "MSRP/List price from catalog"
+    }
+  },
+  "client": {
+    "id": null,
+    "name": null,
+    "company": null,
+    "email": null,
+    "phone": null,
+    "tax_rate": null
+  },
+  "presenter": {
+    "name": null,
+    "company": null,
+    "phone": null,
+    "email": null,
+    "website": null
+  },
+  "products": [],
+  "errors": [],
+  "zoho_integration": {
+    "sku_format": "[ClientAccountNumber]-[VendorSKU]",
+    "mpn_source": "vendor_sku or mpn field",
+    "vendor_match_key": "vendor.website",
+    "track_inventory": false,
+    "default_unit": "Piece",
+    "taxable": true
+  },
+  "zoho_upload_result": {
+    "success": true,
+    "total_products": 0,
+    "successful_uploads": 0,
+    "failed_uploads": 0,
+    "duration_seconds": 7.982502,
+    "errors": []
+  }
+}
