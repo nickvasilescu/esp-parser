@@ -1,5 +1,5 @@
 import React from "react";
-import StatusBadge from "./StatusBadge";
+import StatusBadge, { WorkflowStatus } from "./StatusBadge";
 import ProgressBar from "./ProgressBar";
 import {
   X,
@@ -249,7 +249,7 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
             </div>
             <div className="bg-secondary/30 rounded-lg p-4 border border-border">
               <div className="flex items-center justify-between mb-4">
-                <StatusBadge status={job.status} />
+                <StatusBadge status={job.status as WorkflowStatus} />
                 <span className="font-bold text-xl text-emerald-500">
                   {job.progress}%
                 </span>

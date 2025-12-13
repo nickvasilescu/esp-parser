@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import StatusBadge from "./StatusBadge";
+import StatusBadge, { WorkflowStatus } from "./StatusBadge";
 import ProgressBar from "./ProgressBar";
 import { ChevronRight, Search, Loader2 } from "lucide-react";
 
@@ -122,7 +122,7 @@ export default function JobsTable({
                 onClick={() => onSelectJob(job)}
               >
                 <td className="px-4 py-3">
-                  <StatusBadge status={job.status} />
+                  <StatusBadge status={job.status as WorkflowStatus} />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
