@@ -22,6 +22,13 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 import httpx
 
+# Import JobStateManager for state updates (optional dependency)
+try:
+    from job_state import JobStateManager, WorkflowStatus
+except ImportError:
+    JobStateManager = None
+    WorkflowStatus = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -623,26 +630,28 @@ def extract_dimensions_from_text(text: str) -> Optional[str]:
 def enrich_products_with_net_costs(
     products: List[SAGEProduct],
     api_client: 'SAGEAPIClient',
-    use_full_product_detail: bool = True
+    use_full_product_detail: bool = True,
+    state_manager: Optional["JobStateManager"] = None
 ) -> List[SAGEProduct]:
     """
     Enrich products with authoritative net costs from Full Product Detail API.
-    
+
     The Presentation API provides:
-    - sellPrcs: SELL PRICE (what customer sees) ← TRUSTED for sell price
+    - sellPrcs: SELL PRICE (what customer sees) <- TRUSTED for sell price
     - costs: Cost from presentation (may be adjusted by sales rep)
-    
+
     The Full Product Detail API (serviceId 105) provides:
-    - net: Authoritative NET COST from SAGE database ← TRUSTED for net cost
-    
+    - net: Authoritative NET COST from SAGE database <- TRUSTED for net cost
+
     This function calls the Full Product Detail API for each product and
     updates the net_cost values with the authoritative data.
-    
+
     Args:
         products: List of products parsed from presentation
         api_client: SAGE API client
         use_full_product_detail: If True, call Full Product Detail API for net costs
-        
+        state_manager: Optional JobStateManager for state updates
+
     Returns:
         Enriched products with authoritative net costs
     """
@@ -673,7 +682,17 @@ def enrich_products_with_net_costs(
                     return products
     
     enriched_count = 0
-    for product in products:
+    total_products = len(products)
+    for idx, product in enumerate(products, 1):
+        # Emit per-product progress
+        if state_manager and WorkflowStatus:
+            state_manager.update(
+                WorkflowStatus.SAGE_ENRICHING_PRODUCTS.value,
+                current_item=idx,
+                total_items=total_products,
+                current_item_name=product.name
+            )
+
         # Get product ID - use encrypted_prod_id for API (required by Full Product Detail)
         # Fall back to SPC if no encrypted_prod_id
         encrypted_id = product.encrypted_prod_id
@@ -808,19 +827,27 @@ class SAGEHandler:
         presentation_url: str,
         acct_id: int = SAGE_ACCT_ID,
         login_id: str = SAGE_LOGIN_ID,
-        auth_key: str = SAGE_AUTH_KEY
+        auth_key: str = SAGE_AUTH_KEY,
+        state_manager: Optional["JobStateManager"] = None
     ):
         """
         Initialize the SAGE handler.
-        
+
         Args:
             presentation_url: URL of the SAGE presentation (viewpresentation.com)
             acct_id: SAGE account ID (default from config)
             login_id: SAGE login ID (default from config)
             auth_key: SAGE auth key (default from config)
+            state_manager: Optional JobStateManager for state updates
         """
         self.presentation_url = presentation_url
         self.api_client = SAGEAPIClient(acct_id, login_id, auth_key)
+        self.state_manager = state_manager
+
+    def _update_state(self, status: str, **kwargs) -> None:
+        """Update job state if state manager is available."""
+        if self.state_manager and WorkflowStatus:
+            self.state_manager.update(status, **kwargs)
     
     def process(
         self,
@@ -878,11 +905,17 @@ class SAGEHandler:
             logger.info("Step 2: Calling SAGE Presentation API...")
             logger.info("  → sellPrcs = SELL PRICE (what customer sees)")
             logger.info("  → costs = Presentation cost (may be adjusted)")
+            self._update_state(
+                WorkflowStatus.SAGE_CALLING_API.value if WorkflowStatus else "sage_calling_api"
+            )
             raw_data = self.api_client.get_presentation(pres_id)
             logger.info(f"  Items in presentation: {raw_data.get('itemCnt', 0)}")
             
             # Step 3: Parse response
             logger.info("Step 3: Parsing presentation data...")
+            self._update_state(
+                WorkflowStatus.SAGE_PARSING_RESPONSE.value if WorkflowStatus else "sage_parsing_response"
+            )
             result = parse_presentation_response(raw_data, self.presentation_url)
             
             logger.info(f"  Title: {result.presentation_title}")
@@ -895,10 +928,16 @@ class SAGEHandler:
             if enrich_net_costs:
                 logger.info("Step 4: Enriching with Full Product Detail API...")
                 logger.info("  → net = NET COST (authoritative SAGE database cost)")
+                self._update_state(
+                    WorkflowStatus.SAGE_ENRICHING_PRODUCTS.value if WorkflowStatus else "sage_enriching_products",
+                    current_item=0,
+                    total_items=len(result.products)
+                )
                 result.products = enrich_products_with_net_costs(
                     result.products,
                     self.api_client,
-                    use_full_product_detail=True
+                    use_full_product_detail=True,
+                    state_manager=self.state_manager
                 )
             else:
                 logger.info("Step 4: Skipping Full Product Detail enrichment (using presentation costs)")

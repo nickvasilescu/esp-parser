@@ -33,6 +33,13 @@ from config import (
     REMOTE_DOWNLOAD_DIR,
 )
 
+# Import JobStateManager for state updates (optional dependency)
+try:
+    from job_state import JobStateManager, WorkflowStatus
+except ImportError:
+    JobStateManager = None
+    WorkflowStatus = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -225,34 +232,42 @@ class ESPPresentationDownloader:
         job_id: str,
         upload_url: str,
         computer_id: Optional[str] = None,
-        dry_run: bool = False
+        dry_run: bool = False,
+        state_manager: Optional["JobStateManager"] = None
     ):
         """
         Initialize the ESP Presentation Downloader.
-        
+
         Args:
             presentation_url: URL of the ESP presentation
             job_id: Unique job identifier for organizing files
             upload_url: Pre-signed S3 URL for uploading the PDF
             computer_id: Optional Orgo computer ID (defaults to ORGO_COMPUTER_ID)
             dry_run: If True, don't execute the CUA
+            state_manager: Optional JobStateManager for state updates
         """
         self.presentation_url = presentation_url
         self.job_id = job_id
         self.upload_url = upload_url
         self.computer_id = computer_id or ORGO_COMPUTER_ID
         self.dry_run = dry_run
-        
+        self.state_manager = state_manager
+
         self.computer: Optional[Computer] = None
-        
+
         # Set API keys in environment
         os.environ["ORGO_API_KEY"] = os.getenv("ORGO_API_KEY", "")
         os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "")
     
+    def _update_state(self, status: str, **kwargs) -> None:
+        """Update job state if state manager is available."""
+        if self.state_manager and WorkflowStatus:
+            self.state_manager.update(status, **kwargs)
+
     def run(self) -> DownloadResult:
         """
         Execute the download workflow.
-        
+
         Returns:
             DownloadResult with success status and file path
         """
@@ -263,42 +278,90 @@ class ESPPresentationDownloader:
         logger.info(f"URL: {self.presentation_url}")
         logger.info(f"Upload URL: {self.upload_url[:80]}...")
         logger.info(f"Dry run: {self.dry_run}")
-        
+
         if self.dry_run:
             logger.info("[DRY RUN] Skipping CUA execution")
             return DownloadResult(
                 success=False,
                 error="Dry run mode - no download performed"
             )
-        
+
         try:
+            # Emit state: downloading presentation
+            self._update_state(
+                WorkflowStatus.ESP_DOWNLOADING_PRESENTATION.value if WorkflowStatus else "esp_downloading_presentation"
+            )
+
             # Initialize Orgo computer
             logger.info(f"Connecting to Orgo computer: {self.computer_id}")
             self.computer = Computer(computer_id=self.computer_id)
             logger.info(f"Connected to: orgo-{self.computer_id}.orgo.dev")
-            
+
+            # Emit checkpoint for CUA start
+            if self.state_manager:
+                self.state_manager.emit_thought(
+                    agent="cua_presentation",
+                    event_type="checkpoint",
+                    content="Starting CUA to download presentation PDF",
+                    metadata={"presentation_url": self.presentation_url}
+                )
+
             # Build the prompt
             prompt = build_download_prompt(
                 presentation_url=self.presentation_url,
                 job_id=self.job_id,
                 upload_url=self.upload_url
             )
-            
+
             # Define progress callback
             def progress_callback(event_type: str, event_data: Any) -> None:
                 if event_type == "text":
                     logger.info(f"Claude: {event_data}")
+                    # Emit thought for text output
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_presentation",
+                            event_type="thought",
+                            content=str(event_data)[:500]  # Truncate long text
+                        )
+                    # Detect upload phase from CUA output
+                    if "curl" in str(event_data).lower() and "PUT" in str(event_data):
+                        self._update_state(
+                            WorkflowStatus.ESP_UPLOADING_TO_S3.value if WorkflowStatus else "esp_uploading_to_s3"
+                        )
                 elif event_type == "tool_use":
                     action = event_data.get('action', 'unknown')
                     logger.info(f"Action: {action}")
+                    # Emit thought for tool use
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_presentation",
+                            event_type="action",
+                            content=f"Executing: {action}",
+                            details=event_data
+                        )
                 elif event_type == "thinking":
                     logger.debug(f"Thinking: {event_data[:200]}...")
+                    # Emit thought for thinking
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_presentation",
+                            event_type="thought",
+                            content=str(event_data)[:500]
+                        )
                 elif event_type == "error":
                     logger.error(f"Error: {event_data}")
-            
+                    # Emit thought for error
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_presentation",
+                            event_type="error",
+                            content=str(event_data)[:500]
+                        )
+
             # Execute the agent workflow
             logger.info(f"Starting CUA with model: {MODEL_ID}")
-            
+
             messages = self.computer.prompt(
                 prompt,
                 callback=progress_callback,
@@ -310,9 +373,18 @@ class ESPPresentationDownloader:
                 max_iterations=MAX_ITERATIONS,
                 max_tokens=MAX_TOKENS
             )
-            
+
             logger.info("CUA workflow completed")
-            
+
+            # Emit success thought
+            if self.state_manager:
+                self.state_manager.emit_thought(
+                    agent="cua_presentation",
+                    event_type="success",
+                    content="Presentation PDF downloaded and uploaded to S3",
+                    metadata={"remote_path": f"s3://{self.job_id}/presentation.pdf"}
+                )
+
             # The agent should have uploaded the file to S3 via curl
             # We assume success if the prompt completed without exception
             # The orchestrator will verify the file exists in S3
@@ -320,9 +392,15 @@ class ESPPresentationDownloader:
                 success=True,
                 remote_path=f"s3://{self.job_id}/presentation.pdf"
             )
-            
+
         except Exception as e:
             logger.error(f"Download failed: {e}", exc_info=True)
+            if self.state_manager:
+                self.state_manager.add_error(
+                    step="esp_downloading_presentation",
+                    message=str(e),
+                    recoverable=False
+                )
             return DownloadResult(
                 success=False,
                 error=str(e)

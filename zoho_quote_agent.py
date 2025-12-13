@@ -47,6 +47,13 @@ from zoho_data_transformer import (
     extract_numeric_account,
 )
 
+# Import JobStateManager for state updates (optional dependency)
+try:
+    from job_state import JobStateManager, WorkflowStatus
+except ImportError:
+    JobStateManager = None
+    WorkflowStatus = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -227,7 +234,8 @@ class ZohoQuoteAgent:
         model: str = ZOHO_AGENT_MODEL,
         thinking_budget: int = ZOHO_AGENT_THINKING_BUDGET,
         max_tokens: int = ZOHO_AGENT_MAX_TOKENS,
-        max_iterations: int = ZOHO_AGENT_MAX_ITERATIONS
+        max_iterations: int = ZOHO_AGENT_MAX_ITERATIONS,
+        state_manager: Optional["JobStateManager"] = None
     ):
         """
         Initialize the quote agent.
@@ -239,6 +247,7 @@ class ZohoQuoteAgent:
             thinking_budget: Token budget for extended thinking
             max_tokens: Max tokens for responses
             max_iterations: Max tool use iterations
+            state_manager: Optional JobStateManager for state updates
         """
         self.zoho_client = zoho_client or create_zoho_client()
         self.anthropic = anthropic_client or Anthropic()
@@ -246,12 +255,18 @@ class ZohoQuoteAgent:
         self.thinking_budget = thinking_budget
         self.max_tokens = max_tokens
         self.max_iterations = max_iterations
+        self.state_manager = state_manager
 
         # State for current processing session
         self._unified_output: Optional[Dict[str, Any]] = None
         self._item_master_map: Dict[str, str] = {}
         self._quote_result: Optional[QuoteResult] = None
         self._agent_complete = False
+
+    def _update_state(self, status: str, **kwargs) -> None:
+        """Update job state if state manager is available."""
+        if self.state_manager and WorkflowStatus:
+            self.state_manager.update(status, **kwargs)
 
     def _handle_tool_call(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
         """
@@ -299,6 +314,14 @@ class ZohoQuoteAgent:
                 "found": False,
                 "error": "Account number is required"
             })
+
+        # Emit thought for customer search
+        if self.state_manager:
+            self.state_manager.emit_thought(
+                agent="zoho_quote_agent",
+                event_type="action",
+                content=f"Searching for customer by account: {account_number}"
+            )
 
         customer = self.zoho_client.find_customer_by_account_number(account_number)
 
@@ -381,6 +404,20 @@ class ZohoQuoteAgent:
             })
 
         try:
+            # Emit state: creating quote
+            self._update_state(
+                WorkflowStatus.ZOHO_CREATING_QUOTE.value if WorkflowStatus else "zoho_creating_quote"
+            )
+
+            # Emit thought for quote creation
+            if self.state_manager:
+                products = self._unified_output.get("products", [])
+                self.state_manager.emit_thought(
+                    agent="zoho_quote_agent",
+                    event_type="action",
+                    content=f"Creating draft quote with {len(products)} products"
+                )
+
             # Build the estimate payload
             estimate_payload = build_estimate_payload(
                 unified_output=self._unified_output,
@@ -410,6 +447,15 @@ class ZohoQuoteAgent:
                 total_amount=estimate.get("total"),
                 line_items_count=len(estimate_payload.get("line_items", []))
             )
+
+            # Emit success thought
+            if self.state_manager:
+                self.state_manager.emit_thought(
+                    agent="zoho_quote_agent",
+                    event_type="success",
+                    content=f"Quote created: {estimate.get('estimate_number')} - ${estimate.get('total', 0):.2f}",
+                    metadata={"estimate_number": estimate.get("estimate_number"), "total": estimate.get("total")}
+                )
 
             return json.dumps({
                 "success": True,

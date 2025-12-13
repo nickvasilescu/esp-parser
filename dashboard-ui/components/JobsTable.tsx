@@ -1,10 +1,33 @@
 "use client";
 
 import React from "react";
-import { Job } from "../data/mockData";
 import StatusBadge from "./StatusBadge";
 import ProgressBar from "./ProgressBar";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Search, Loader2 } from "lucide-react";
+
+// Job type from the API
+interface JobFromAPI {
+  id: string;
+  status: string;
+  platform: string;
+  progress: number;
+  current_item: number | null;
+  total_items: number | null;
+  current_item_name: string | null;
+  features: {
+    zoho_upload: boolean;
+    zoho_quote: boolean;
+    calculator: boolean;
+  };
+  started_at: string;
+  updated_at: string;
+  presentation_pdf_url: string | null;
+  output_json_url: string | null;
+  zoho_item_link: string | null;
+  zoho_quote_link: string | null;
+  calculator_link: string | null;
+  errors: string[];
+}
 
 // Format time consistently to avoid hydration mismatches
 function formatTime(isoString: string): string {
@@ -17,16 +40,25 @@ function formatTime(isoString: string): string {
   return `${displayHours}:${displayMinutes} ${ampm}`;
 }
 
+// Format status for display
+function formatStatus(status: string): string {
+  return status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 interface JobsTableProps {
-  jobs: Job[];
-  onSelectJob: (job: Job) => void;
+  jobs: JobFromAPI[];
+  onSelectJob: (job: JobFromAPI) => void;
   className?: string;
+  isLoading?: boolean;
 }
 
 export default function JobsTable({
   jobs,
   onSelectJob,
   className,
+  isLoading,
 }: JobsTableProps) {
   return (
     <div
@@ -35,7 +67,11 @@ export default function JobsTable({
       }`}
     >
       <div className="p-4 border-b border-border flex items-center justify-between">
-        <h3 className="font-medium text-foreground">Active Workflows</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium text-foreground">Active Workflows</h3>
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+          <span className="text-xs text-muted-foreground">({jobs.length})</span>
+        </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1.5 w-4 h-4 text-muted-foreground" />
           <input
@@ -50,15 +86,22 @@ export default function JobsTable({
         <table className="w-full text-sm text-left">
           <thead className="bg-secondary/50 text-muted-foreground font-medium">
             <tr>
-              <th className="px-4 py-3 w-[140px]">Status</th>
+              <th className="px-4 py-3 w-[180px]">Status</th>
               <th className="px-4 py-3">Platform</th>
-              <th className="px-4 py-3">Client</th>
+              <th className="px-4 py-3">Job ID</th>
               <th className="px-4 py-3 w-[200px]">Progress</th>
               <th className="px-4 py-3">Started</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
+            {jobs.length === 0 && !isLoading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  No active workflows
+                </td>
+              </tr>
+            )}
             {jobs.map((job) => (
               <tr
                 key={job.id}
@@ -80,36 +123,46 @@ export default function JobsTable({
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col">
-                    <span className="font-medium text-foreground">
-                      {job.client_name ||
-                        job.client_company ||
-                        "Unknown Client"}
+                    <span className="font-mono text-xs text-foreground">
+                      {job.id}
                     </span>
-                    {job.client_email && (
-                      <span className="text-xs text-muted-foreground">
-                        {job.client_email}
-                      </span>
-                    )}
-                    {job.client_company && job.client_name && (
-                      <span className="text-xs text-muted-foreground">
-                        {job.client_company}
-                      </span>
-                    )}
+                    <div className="flex gap-1 mt-1">
+                      {job.features.zoho_upload && (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded">
+                          Zoho
+                        </span>
+                      )}
+                      {job.features.calculator && (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-purple-500/10 text-purple-400 rounded">
+                          Calc
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground text-right">
-                      {job.progress}%
-                    </span>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {job.current_item !== null && job.total_items !== null
+                          ? `${job.current_item}/${job.total_items}`
+                          : ""}
+                      </span>
+                      <span>{job.progress}%</span>
+                    </div>
                     <ProgressBar progress={job.progress} />
+                    {job.current_item_name && (
+                      <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                        {job.current_item_name}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td
                   className="px-4 py-3 text-muted-foreground"
                   suppressHydrationWarning
                 >
-                  {formatTime(job.created_at)}
+                  {formatTime(job.started_at)}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md opacity-0 group-hover:opacity-100 transition-all">

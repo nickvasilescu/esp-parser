@@ -90,7 +90,7 @@ export default function VMPanel({ className }: VMPanelProps) {
                 host={vmHost}
                 password={vmPassword}
                 label="Orgo CUA"
-                className="w-full"
+                className="w-full max-h-[400px]"
                 onConnectionChange={(connected) => setIsConnected(connected)}
               />
             </div>

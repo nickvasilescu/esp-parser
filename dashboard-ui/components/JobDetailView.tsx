@@ -1,5 +1,4 @@
 import React from "react";
-import { Job, WorkflowStep, ExtractedProduct } from "../data/mockData";
 import StatusBadge from "./StatusBadge";
 import ProgressBar from "./ProgressBar";
 import {
@@ -8,27 +7,39 @@ import {
   FileText,
   Calculator,
   ShoppingCart,
-  Globe,
-  Mail,
-  Building2,
-  User,
-  Link2,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  AlertCircle,
   Package,
-  Download,
-  FileSearch,
-  FileOutput,
-  ClipboardCheck,
-  ChevronRight,
+  AlertCircle,
   Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Job type from the API
+interface JobFromAPI {
+  id: string;
+  status: string;
+  platform: string;
+  progress: number;
+  current_item: number | null;
+  total_items: number | null;
+  current_item_name: string | null;
+  features: {
+    zoho_upload: boolean;
+    zoho_quote: boolean;
+    calculator: boolean;
+  };
+  started_at: string;
+  updated_at: string;
+  presentation_pdf_url: string | null;
+  output_json_url: string | null;
+  zoho_item_link: string | null;
+  zoho_quote_link: string | null;
+  calculator_link: string | null;
+  errors: string[];
+}
+
 interface JobDetailViewProps {
-  job: Job;
+  job: JobFromAPI;
   onClose: () => void;
 }
 
@@ -70,23 +81,22 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
                 </span>
               </div>
 
-              {/* Client Info */}
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  <User className="w-5 h-5 text-emerald-500" />
-                  {job.client_name || "Unknown Client"}
-                </h2>
-                {job.client_company && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Building2 className="w-4 h-4" />
-                    {job.client_company}
-                  </p>
+              {/* Features enabled */}
+              <div className="flex gap-2">
+                {job.features.zoho_upload && (
+                  <span className="text-[10px] px-2 py-1 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">
+                    Zoho Upload
+                  </span>
                 )}
-                {job.client_email && (
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    {job.client_email}
-                  </p>
+                {job.features.zoho_quote && (
+                  <span className="text-[10px] px-2 py-1 bg-green-500/10 text-green-400 rounded border border-green-500/20">
+                    Zoho Quote
+                  </span>
+                )}
+                {job.features.calculator && (
+                  <span className="text-[10px] px-2 py-1 bg-purple-500/10 text-purple-400 rounded border border-purple-500/20">
+                    Calculator
+                  </span>
                 )}
               </div>
             </div>
@@ -101,25 +111,6 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
 
         {/* Content */}
         <div className="p-6 space-y-6 flex-1">
-          {/* Presentation Link */}
-          <section className="bg-secondary/30 rounded-lg p-4 border border-border">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-              <Link2 className="w-4 h-4" />
-              <span className="font-medium uppercase tracking-wider text-xs">
-                Presentation Link
-              </span>
-            </div>
-            <a
-              href={job.source_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-emerald-500 hover:text-emerald-400 flex items-center gap-2 break-all"
-            >
-              {job.source_link}
-              <ExternalLink className="w-3 h-3 shrink-0" />
-            </a>
-          </section>
-
           {/* Current Status & Progress */}
           <section>
             <div className="flex items-center justify-between mb-3">
@@ -141,7 +132,7 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
               <ProgressBar progress={job.progress} showLabel={false} />
 
               {/* Product Progress */}
-              {job.total_products > 0 && (
+              {job.total_items !== null && job.total_items > 0 && (
                 <div className="mt-3 pt-3 border-t border-border">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-2">
@@ -149,65 +140,39 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
                       Products Processed
                     </span>
                     <span className="font-mono font-medium text-foreground">
-                      {job.products_processed}/{job.total_products}
+                      {job.current_item || 0}/{job.total_items}
                     </span>
                   </div>
+                  {job.current_item_name && (
+                    <p className="text-xs text-muted-foreground mt-2 truncate">
+                      Current: {job.current_item_name}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           </section>
 
-          {/* Workflow Pipeline */}
+          {/* Timeline */}
           <section>
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
-              Workflow Pipeline
+              Timeline
             </h3>
-            <div className="space-y-1">
-              {job.workflow_steps?.map((step, idx) => (
-                <WorkflowStepItem
-                  key={idx}
-                  step={step}
-                  isLast={idx === job.workflow_steps.length - 1}
-                />
-              ))}
+            <div className="bg-secondary/30 rounded-lg p-4 border border-border space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Started</span>
+                <span className="font-mono text-foreground">
+                  {new Date(job.started_at).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Last Updated</span>
+                <span className="font-mono text-foreground">
+                  {new Date(job.updated_at).toLocaleString()}
+                </span>
+              </div>
             </div>
           </section>
-
-          {/* Extracted Products */}
-          {job.products_extracted && job.products_extracted.length > 0 && (
-            <section>
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                Extracted Products ({job.products_extracted.length})
-              </h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {job.products_extracted.map((product, idx) => (
-                  <ProductItem key={idx} product={product} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Action Items */}
-          {job.action_items.length > 0 && (
-            <section>
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                Current Actions
-              </h3>
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-                <ul className="space-y-2">
-                  {job.action_items.map((item, idx) => (
-                    <li
-                      key={idx}
-                      className="text-sm text-amber-500 flex items-start gap-2"
-                    >
-                      <ChevronRight className="w-4 h-4 mt-0.5 shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          )}
 
           {/* Errors */}
           {job.errors && job.errors.length > 0 && (
@@ -223,7 +188,7 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
                       className="text-sm text-red-400 flex items-start gap-2"
                     >
                       <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                      {error}
+                      {typeof error === "string" ? error : JSON.stringify(error)}
                     </li>
                   ))}
                 </ul>
@@ -231,27 +196,7 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
             </section>
           )}
 
-          {/* Vendor & Product Info */}
-          {(job.vendor || job.mpn) && (
-            <section className="grid grid-cols-2 gap-3">
-              <div className="bg-secondary/30 p-3 rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground mb-1">
-                  Primary Vendor
-                </p>
-                <p className="font-medium text-foreground truncate">
-                  {job.vendor || "Pending..."}
-                </p>
-              </div>
-              <div className="bg-secondary/30 p-3 rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground mb-1">MPN</p>
-                <p className="font-medium text-foreground font-mono truncate">
-                  {job.mpn || "Pending..."}
-                </p>
-              </div>
-            </section>
-          )}
-
-          {/* S3 Artifacts */}
+          {/* Generated Artifacts */}
           <section>
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
               Generated Artifacts
@@ -265,7 +210,7 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
               <ArtifactLink
                 label="Output JSON"
                 url={job.output_json_url}
-                icon={<FileOutput className="w-4 h-4" />}
+                icon={<FileText className="w-4 h-4" />}
               />
             </div>
           </section>
@@ -276,12 +221,6 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
               Zoho Integration
             </h3>
             <div className="space-y-2">
-              <ResourceLink
-                label="Vendor Website"
-                url={job.vendor_website}
-                icon={<Globe className="w-4 h-4" />}
-                disabled={!job.vendor_website}
-              />
               <ResourceLink
                 label="Zoho Item Master"
                 url={job.zoho_item_link}
@@ -303,164 +242,8 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
               />
             </div>
           </section>
-
-          {/* Quote Value */}
-          {job.value > 0 && (
-            <section className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-emerald-400">
-                  Estimated Quote Value
-                </span>
-                <span className="text-2xl font-bold text-emerald-500">
-                  $
-                  {job.value.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            </section>
-          )}
         </div>
       </motion.div>
-    </div>
-  );
-}
-
-function WorkflowStepItem({
-  step,
-  isLast,
-}: {
-  step: WorkflowStep;
-  isLast: boolean;
-}) {
-  const getStepIcon = (stepNum: number) => {
-    const icons: Record<number, React.ReactNode> = {
-      1: <Mail className="w-3 h-3" />,
-      2: <Download className="w-3 h-3" />,
-      3: <FileSearch className="w-3 h-3" />,
-      4: <Download className="w-3 h-3" />,
-      5: <FileSearch className="w-3 h-3" />,
-      6: <FileOutput className="w-3 h-3" />,
-      7: <ClipboardCheck className="w-3 h-3" />,
-    };
-    return icons[stepNum] || <Circle className="w-3 h-3" />;
-  };
-
-  const getStatusStyles = () => {
-    switch (step.status) {
-      case "completed":
-        return {
-          bg: "bg-emerald-500",
-          text: "text-foreground",
-          icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
-        };
-      case "in_progress":
-        return {
-          bg: "bg-blue-500 animate-pulse",
-          text: "text-foreground font-medium",
-          icon: <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />,
-        };
-      case "error":
-        return {
-          bg: "bg-red-500",
-          text: "text-red-400",
-          icon: <AlertCircle className="w-4 h-4 text-red-500" />,
-        };
-      default:
-        return {
-          bg: "bg-muted",
-          text: "text-muted-foreground",
-          icon: <Circle className="w-4 h-4 text-muted-foreground" />,
-        };
-    }
-  };
-
-  const styles = getStatusStyles();
-
-  return (
-    <div className="flex items-start gap-3">
-      {/* Step indicator */}
-      <div className="flex flex-col items-center">
-        <div
-          className={`w-6 h-6 rounded-full ${styles.bg} flex items-center justify-center text-white text-xs`}
-        >
-          {step.status === "completed" ? (
-            <CheckCircle2 className="w-4 h-4" />
-          ) : step.status === "in_progress" ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : step.status === "error" ? (
-            <AlertCircle className="w-4 h-4" />
-          ) : (
-            <span>{step.step}</span>
-          )}
-        </div>
-        {!isLast && (
-          <div
-            className={`w-0.5 h-6 ${
-              step.status === "completed" ? "bg-emerald-500" : "bg-muted"
-            }`}
-          />
-        )}
-      </div>
-
-      {/* Step content */}
-      <div className="flex-1 pb-4">
-        <div className="flex items-center gap-2">
-          {getStepIcon(step.step)}
-          <span className={`text-sm ${styles.text}`}>{step.name}</span>
-        </div>
-        {step.details && step.status === "in_progress" && (
-          <p className="text-xs text-muted-foreground mt-1 ml-5">
-            {step.details}
-          </p>
-        )}
-        {step.completed_at && step.status === "completed" && (
-          <p className="text-xs text-muted-foreground mt-1 ml-5">
-            Completed at {new Date(step.completed_at).toLocaleTimeString()}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ProductItem({ product }: { product: ExtractedProduct }) {
-  return (
-    <div className="bg-secondary/30 rounded-lg p-3 border border-border">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="font-mono text-xs text-muted-foreground">
-            {product.cpn}
-          </p>
-          <p className="text-sm font-medium text-foreground truncate">
-            {product.name}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {product.vendor} · {product.mpn}
-          </p>
-        </div>
-        <div className="flex items-center gap-1 ml-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              product.pdf_downloaded ? "bg-emerald-500" : "bg-muted"
-            }`}
-            title="PDF Downloaded"
-          />
-          <span
-            className={`w-2 h-2 rounded-full ${
-              product.pdf_parsed ? "bg-emerald-500" : "bg-muted"
-            }`}
-            title="PDF Parsed"
-          />
-        </div>
-      </div>
-      {product.error && (
-        <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" />
-          {product.error}
-        </p>
-      )}
     </div>
   );
 }

@@ -38,6 +38,13 @@ from zoho_config import (
     get_zoho_config_summary,
 )
 from zoho_client import ZohoClient, ZohoAPIError, create_zoho_client
+
+# Import JobStateManager for state updates (optional dependency)
+try:
+    from job_state import JobStateManager, WorkflowStatus
+except ImportError:
+    JobStateManager = None
+    WorkflowStatus = None
 from zoho_data_transformer import (
     build_item_name_sku,
     get_base_code,
@@ -316,11 +323,12 @@ class ZohoItemMasterAgent:
         model: str = ZOHO_AGENT_MODEL,
         thinking_budget: int = ZOHO_AGENT_THINKING_BUDGET,
         max_tokens: int = ZOHO_AGENT_MAX_TOKENS,
-        max_iterations: int = ZOHO_AGENT_MAX_ITERATIONS
+        max_iterations: int = ZOHO_AGENT_MAX_ITERATIONS,
+        state_manager: Optional["JobStateManager"] = None
     ):
         """
         Initialize the agent.
-        
+
         Args:
             zoho_client: ZohoClient instance (created if not provided)
             anthropic_client: Anthropic client (created if not provided)
@@ -328,6 +336,7 @@ class ZohoItemMasterAgent:
             thinking_budget: Token budget for extended thinking
             max_tokens: Max tokens for responses
             max_iterations: Max tool use iterations
+            state_manager: Optional JobStateManager for state updates
         """
         self.zoho_client = zoho_client or create_zoho_client()
         self.anthropic = anthropic_client or Anthropic()
@@ -335,13 +344,21 @@ class ZohoItemMasterAgent:
         self.thinking_budget = thinking_budget
         self.max_tokens = max_tokens
         self.max_iterations = max_iterations
-        
+        self.state_manager = state_manager
+
         # State for current processing session
         self._unified_output: Optional[Dict[str, Any]] = None
         self._discovered_fields: Dict[str, Optional[str]] = {}
         self._category_map: Dict[str, str] = {}
         self._results: List[ItemUploadResult] = []
         self._agent_complete = False
+        self._items_uploaded = 0
+        self._total_items = 0
+
+    def _update_state(self, status: str, **kwargs) -> None:
+        """Update job state if state manager is available."""
+        if self.state_manager and WorkflowStatus:
+            self.state_manager.update(status, **kwargs)
         
     def _handle_tool_call(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
         """
@@ -388,14 +405,34 @@ class ZohoItemMasterAgent:
     
     def _tool_search_contact(self, tool_input: Dict[str, Any]) -> str:
         """Search for a Zoho contact."""
+        self._update_state(
+            WorkflowStatus.ZOHO_SEARCHING_CUSTOMER.value if WorkflowStatus else "zoho_searching_customer"
+        )
+
+        # Emit thought for customer search
+        if self.state_manager:
+            search_term = tool_input.get("name") or tool_input.get("email") or tool_input.get("company_name") or "unknown"
+            self.state_manager.emit_thought(
+                agent="zoho_item_agent",
+                event_type="action",
+                content=f"Searching Zoho for customer: {search_term}"
+            )
+
         contacts = self.zoho_client.search_contacts(
             name=tool_input.get("name"),
             email=tool_input.get("email"),
             company_name=tool_input.get("company_name")
         )
-        
+
         if contacts:
             contact = contacts[0]
+            # Emit success thought
+            if self.state_manager:
+                self.state_manager.emit_thought(
+                    agent="zoho_item_agent",
+                    event_type="success",
+                    content=f"Found customer: {contact.get('contact_name')} ({contact.get('contact_number')})"
+                )
             return json.dumps({
                 "found": True,
                 "contact_id": contact.get("contact_id"),
@@ -405,6 +442,13 @@ class ZohoItemMasterAgent:
                 "email": contact.get("email")
             })
         else:
+            # Emit not found thought
+            if self.state_manager:
+                self.state_manager.emit_thought(
+                    agent="zoho_item_agent",
+                    event_type="observation",
+                    content="Customer not found in Zoho, using UNKNOWN"
+                )
             return json.dumps({
                 "found": False,
                 "message": "No matching contact found. You may use 'UNKNOWN' as the account number."
@@ -412,6 +456,9 @@ class ZohoItemMasterAgent:
     
     def _tool_discover_custom_fields(self) -> str:
         """Discover custom fields in Zoho."""
+        self._update_state(
+            WorkflowStatus.ZOHO_DISCOVERING_FIELDS.value if WorkflowStatus else "zoho_discovering_fields"
+        )
         try:
             self._discovered_fields = self.zoho_client.discover_custom_fields(
                 patterns=CUSTOM_FIELD_PATTERNS,
@@ -440,7 +487,7 @@ class ZohoItemMasterAgent:
     def _tool_upsert_item(self, tool_input: Dict[str, Any]) -> str:
         """
         Upsert an item to Zoho with full variation and fee expansion.
-        
+
         Creates separate Zoho items for:
         1. Each product variation (color, size, decoration method)
         2. Each fee associated with the product
@@ -449,16 +496,34 @@ class ZohoItemMasterAgent:
         client_account_number = tool_input.get("client_account_number")
         include_variations = tool_input.get("include_variations", False)
         include_fees = tool_input.get("include_fees", False)
-        
+
         if self._unified_output is None:
             return json.dumps({"error": "No unified output loaded"})
-        
+
         products = self._unified_output.get("products", [])
         if product_index < 0 or product_index >= len(products):
             return json.dumps({"error": f"Invalid product index: {product_index}"})
-        
+
         product = products[product_index]
         product_name = product.get("item", {}).get("name", "Unknown")
+
+        # Emit per-item progress
+        self._items_uploaded += 1
+        self._update_state(
+            WorkflowStatus.ZOHO_UPLOADING_ITEMS.value if WorkflowStatus else "zoho_uploading_items",
+            current_item=self._items_uploaded,
+            total_items=self._total_items,
+            current_item_name=product_name
+        )
+
+        # Emit thought for item upsert
+        if self.state_manager:
+            self.state_manager.emit_thought(
+                agent="zoho_item_agent",
+                event_type="action",
+                content=f"Upserting item to Zoho: {product_name}",
+                metadata={"product_index": product_index, "item_number": self._items_uploaded, "total_items": self._total_items}
+            )
         
         try:
             # Get base code for naming
@@ -588,6 +653,15 @@ class ZohoItemMasterAgent:
                     except Exception as e:
                         logger.error(f"Failed to create fee item {fee_sku}: {e}")
             
+            # Emit success thought
+            if self.state_manager:
+                self.state_manager.emit_thought(
+                    agent="zoho_item_agent",
+                    event_type="success",
+                    content=f"Created {len(created_items)} item(s) for: {product_name}",
+                    metadata={"variations": len(created_items), "fees": len(fee_items_created)}
+                )
+
             return json.dumps({
                 "success": True,
                 "product_name": product_name,
@@ -704,11 +778,20 @@ class ZohoItemMasterAgent:
     def _tool_report_completion(self, tool_input: Dict[str, Any]) -> str:
         """Mark agent as complete."""
         self._agent_complete = True
-        
+
         summary = tool_input.get("summary", "Processing complete")
         successful = tool_input.get("successful_count", 0)
         failed = tool_input.get("failed_count", 0)
-        
+
+        # Emit completion thought
+        if self.state_manager:
+            self.state_manager.emit_thought(
+                agent="zoho_item_agent",
+                event_type="checkpoint",
+                content=f"Item Master upload complete: {successful} successful, {failed} failed",
+                metadata={"successful": successful, "failed": failed}
+            )
+
         return json.dumps({
             "acknowledged": True,
             "summary": summary,
@@ -749,8 +832,10 @@ class ZohoItemMasterAgent:
         self._category_map = {}
         self._results = []
         self._agent_complete = False
-        
+        self._items_uploaded = 0
+
         products = unified_output.get("products", [])
+        self._total_items = len(products)
         client_info = unified_output.get("client", {})
         metadata = unified_output.get("metadata", {})
         

@@ -7,63 +7,110 @@ import VMPanel from "../components/VMPanel";
 import JobsTable from "../components/JobsTable";
 import JobDetailView from "../components/JobDetailView";
 import AgentThoughts from "../components/AgentThoughts";
-import { mockJobs, Job } from "../data/mockData";
-import { Activity, DollarSign, Timer, Zap } from "lucide-react";
+import { useActiveJob } from "../hooks/useActiveJob";
+import { FileText, Timer, Package, CheckCircle, Loader2 } from "lucide-react";
+
+// Job type from the API
+interface JobFromAPI {
+  id: string;
+  status: string;
+  platform: string;
+  progress: number;
+  current_item: number | null;
+  total_items: number | null;
+  current_item_name: string | null;
+  features: {
+    zoho_upload: boolean;
+    zoho_quote: boolean;
+    calculator: boolean;
+  };
+  started_at: string;
+  updated_at: string;
+  presentation_pdf_url: string | null;
+  output_json_url: string | null;
+  zoho_item_link: string | null;
+  zoho_quote_link: string | null;
+  calculator_link: string | null;
+  errors: string[];
+}
 
 export default function Home() {
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobFromAPI | null>(null);
 
-  // Calculate stats
-  const completedJobs = mockJobs.filter((j) => j.status === "completed");
-  const activeJobs = mockJobs.filter(
-    (j) => j.status !== "completed" && j.status !== "error"
+  // Fetch real jobs from the API
+  const { allJobs, isLoading } = useActiveJob(2000);
+
+  // ==========================================================================
+  // METRIC CALCULATIONS (using real data)
+  // ==========================================================================
+
+  // 1. QUOTES GENERATED (cumulative)
+  // Count jobs that have a Zoho quote link (quote was successfully created)
+  const quotesGenerated = allJobs.filter(
+    (job) => job.zoho_quote_link !== null
+  ).length;
+
+  // 2. HOURS SAVED (based on actual workflow runtime)
+  // Sum of (updated_at - started_at) for completed/partial_success jobs
+  const completedJobs = allJobs.filter(
+    (job) => job.status === "completed" || job.status === "partial_success"
   );
+  const totalRuntimeMs = completedJobs.reduce((acc, job) => {
+    const start = new Date(job.started_at).getTime();
+    const end = new Date(job.updated_at).getTime();
+    return acc + (end - start);
+  }, 0);
+  const hoursSaved = (totalRuntimeMs / (1000 * 60 * 60)).toFixed(1);
 
-  // Business Metrics
-  const pipelineValue = activeJobs.reduce(
-    (acc, job) => acc + (job.value || 0),
+  // 3. PRODUCTS PARSED (cumulative)
+  // Sum of total_items across all jobs that have it
+  const productsParsed = allJobs.reduce(
+    (acc, job) => acc + (job.total_items || 0),
     0
   );
-  const processedValue = completedJobs.reduce(
-    (acc, job) => acc + (job.value || 0),
-    0
-  );
-  const hoursSaved = (completedJobs.length * 0.5).toFixed(1);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // 4. SUCCESS RATE
+  // (completed + partial_success) / (completed + partial_success + error) × 100
+  const terminalJobs = allJobs.filter(
+    (job) =>
+      job.status === "completed" ||
+      job.status === "partial_success" ||
+      job.status === "error"
+  );
+  const successfulJobs = terminalJobs.filter(
+    (job) => job.status === "completed" || job.status === "partial_success"
+  );
+  const successRate =
+    terminalJobs.length > 0
+      ? ((successfulJobs.length / terminalJobs.length) * 100).toFixed(1)
+      : "--";
 
   return (
     <Layout>
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <SummaryCard
-          label="$ Processed"
-          value={formatCurrency(processedValue)}
-          icon={<DollarSign className="w-4 h-4 text-emerald-500" />}
+          label="Quotes Generated"
+          value={quotesGenerated}
+          icon={<FileText className="w-4 h-4 text-emerald-500" />}
           color="border-l-4 border-l-emerald-500"
-        />
-        <SummaryCard
-          label="Pipeline Value"
-          value={formatCurrency(pipelineValue)}
-          icon={<Activity className="w-4 h-4 text-blue-500" />}
-          color="border-l-4 border-l-blue-500"
         />
         <SummaryCard
           label="Hours Saved"
           value={`${hoursSaved} hrs`}
-          icon={<Timer className="w-4 h-4 text-purple-500" />}
+          icon={<Timer className="w-4 h-4 text-blue-500" />}
+          color="border-l-4 border-l-blue-500"
+        />
+        <SummaryCard
+          label="Products Parsed"
+          value={productsParsed}
+          icon={<Package className="w-4 h-4 text-purple-500" />}
           color="border-l-4 border-l-purple-500"
         />
         <SummaryCard
-          label="Bot Efficiency"
-          value="99.8%"
-          icon={<Zap className="w-4 h-4 text-amber-500" />}
+          label="Success Rate"
+          value={successRate === "--" ? "--" : `${successRate}%`}
+          icon={<CheckCircle className="w-4 h-4 text-amber-500" />}
           color="border-l-4 border-l-amber-500"
         />
       </div>
@@ -75,9 +122,10 @@ export default function Home() {
 
         {/* Active Workflows Table - Right/Bottom */}
         <JobsTable
-          jobs={mockJobs}
+          jobs={allJobs}
           onSelectJob={setSelectedJob}
           className="max-h-[400px]"
+          isLoading={isLoading}
         />
       </div>
 

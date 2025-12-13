@@ -1,0 +1,22 @@
+{
+  "job_id": "esp_20251212_163142",
+  "status": "esp_downloading_presentation",
+  "platform": "ESP",
+  "progress": 10,
+  "current_item": null,
+  "total_items": null,
+  "current_item_name": null,
+  "features": {
+    "zoho_upload": true,
+    "zoho_quote": false,
+    "calculator": true
+  },
+  "started_at": "2025-12-13T00:31:42.803097Z",
+  "updated_at": "2025-12-13T00:31:42.950348Z",
+  "presentation_pdf_url": null,
+  "output_json_url": null,
+  "zoho_item_link": null,
+  "zoho_quote_link": null,
+  "calculator_link": null,
+  "errors": []
+}

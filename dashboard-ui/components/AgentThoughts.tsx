@@ -12,159 +12,16 @@ import {
   AlertCircle,
   Eye,
   MousePointer2,
-  FileText,
-  Search,
-  Download,
   Zap,
+  Wrench,
 } from "lucide-react";
-
-interface ThoughtEntry {
-  id: string;
-  timestamp: Date;
-  type:
-    | "thought"
-    | "action"
-    | "observation"
-    | "checkpoint"
-    | "error"
-    | "success";
-  agent: "orchestrator" | "cua_presentation" | "cua_product" | "claude_parser";
-  content: string;
-  details?: string;
-}
-
-// Helper to create stable mock timestamps
-const createMockTimestamp = (secondsAgo: number): Date => {
-  // Use a fixed base time for SSR consistency
-  const baseTime = new Date("2024-12-04T10:30:00.000Z");
-  return new Date(baseTime.getTime() - secondsAgo * 1000);
-};
-
-// Mock thoughts data simulating real-time agent activity
-const initialMockThoughts: ThoughtEntry[] = [
-  {
-    id: "1",
-    timestamp: createMockTimestamp(45),
-    type: "checkpoint",
-    agent: "orchestrator",
-    content: "Pipeline initiated for presentation 500183020",
-    details: "Client: Sarah Johnson | Platform: ESP",
-  },
-  {
-    id: "2",
-    timestamp: createMockTimestamp(42),
-    type: "thought",
-    agent: "orchestrator",
-    content: "Analyzing presentation URL structure...",
-    details: "Detected ESP portal format with accessCode parameter",
-  },
-  {
-    id: "3",
-    timestamp: createMockTimestamp(40),
-    type: "action",
-    agent: "cua_presentation",
-    content: "Navigating to presentation portal",
-    details: "URL: https://portal.mypromooffice.com/presentations/500183020",
-  },
-  {
-    id: "4",
-    timestamp: createMockTimestamp(35),
-    type: "observation",
-    agent: "cua_presentation",
-    content: "Page loaded successfully - detected 25 products in presentation",
-  },
-  {
-    id: "5",
-    timestamp: createMockTimestamp(32),
-    type: "action",
-    agent: "cua_presentation",
-    content: "Clicking 'Download PDF' button",
-    details: "Element found at coordinates (1245, 89)",
-  },
-  {
-    id: "6",
-    timestamp: createMockTimestamp(28),
-    type: "success",
-    agent: "cua_presentation",
-    content: "Presentation PDF downloaded successfully",
-    details: "File size: 2.4 MB | Pages: 28",
-  },
-  {
-    id: "7",
-    timestamp: createMockTimestamp(25),
-    type: "checkpoint",
-    agent: "orchestrator",
-    content: "Step 2 complete - Starting presentation parsing",
-  },
-  {
-    id: "8",
-    timestamp: createMockTimestamp(22),
-    type: "thought",
-    agent: "claude_parser",
-    content: "Analyzing PDF structure using Claude Opus 4.5...",
-    details: "Extracting product information from 28 pages",
-  },
-  {
-    id: "9",
-    timestamp: createMockTimestamp(18),
-    type: "observation",
-    agent: "claude_parser",
-    content: "Identified 25 unique products with CPNs",
-    details: "Vendors detected: A Plus Wine Designs, Prime Line, Hit Promo",
-  },
-  {
-    id: "10",
-    timestamp: createMockTimestamp(15),
-    type: "success",
-    agent: "claude_parser",
-    content: "Presentation parsing complete",
-    details: "25 products extracted with full metadata",
-  },
-  {
-    id: "11",
-    timestamp: createMockTimestamp(12),
-    type: "checkpoint",
-    agent: "orchestrator",
-    content: "Step 3 starting - Sequential product lookup (1/25)",
-  },
-  {
-    id: "12",
-    timestamp: createMockTimestamp(10),
-    type: "action",
-    agent: "cua_product",
-    content: "Opening Firefox and navigating to ESP+",
-    details: "Target: CPN-564949909 (Wine Opener Deluxe)",
-  },
-  {
-    id: "13",
-    timestamp: createMockTimestamp(7),
-    type: "observation",
-    agent: "cua_product",
-    content: "ESP+ login page detected - checking session status",
-  },
-  {
-    id: "14",
-    timestamp: createMockTimestamp(5),
-    type: "thought",
-    agent: "cua_product",
-    content: "Session active from previous run - proceeding to search",
-  },
-  {
-    id: "15",
-    timestamp: createMockTimestamp(3),
-    type: "action",
-    agent: "cua_product",
-    content: "Entering product search query: CPN-564949909",
-  },
-  {
-    id: "16",
-    timestamp: createMockTimestamp(1),
-    type: "thought",
-    agent: "cua_product",
-    content: "Waiting for search results to load...",
-    details: "Expected: Product details page with distributor report option",
-  },
-];
+import { useActiveJob } from "../hooks/useActiveJob";
+import {
+  useThoughtsPolling,
+  ThoughtEntry,
+  AgentType,
+  EventType,
+} from "../hooks/useThoughtsPolling";
 
 interface AgentThoughtsProps {
   className?: string;
@@ -172,15 +29,13 @@ interface AgentThoughtsProps {
 
 export default function AgentThoughts({ className }: AgentThoughtsProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [thoughts, setThoughts] = useState<ThoughtEntry[]>(initialMockThoughts);
-  const [isStreaming, setIsStreaming] = useState(true);
-  const [isMounted, setIsMounted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Handle client-side mounting
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  // Get active job and poll for its thoughts
+  const { activeJobId } = useActiveJob();
+  const { thoughts, isLoading, error } = useThoughtsPolling(activeJobId);
+
+  const isStreaming = activeJobId !== null && thoughts.length > 0;
 
   // Auto-scroll to bottom when new thoughts arrive
   useEffect(() => {
@@ -189,53 +44,7 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
     }
   }, [thoughts, isCollapsed]);
 
-  // Simulate new thoughts coming in
-  useEffect(() => {
-    if (!isStreaming) return;
-
-    const newThoughts: ThoughtEntry[] = [
-      {
-        id: "sim_1",
-        timestamp: new Date(),
-        type: "observation",
-        agent: "cua_product",
-        content: "Search results loaded - found matching product",
-      },
-      {
-        id: "sim_2",
-        timestamp: new Date(),
-        type: "action",
-        agent: "cua_product",
-        content: "Clicking on product to view details",
-      },
-      {
-        id: "sim_3",
-        timestamp: new Date(),
-        type: "thought",
-        agent: "cua_product",
-        content: "Looking for 'Print' button to generate distributor report...",
-      },
-    ];
-
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < newThoughts.length) {
-        setThoughts((prev) => [
-          ...prev,
-          {
-            ...newThoughts[index],
-            id: `live_${Date.now()}`,
-            timestamp: new Date(),
-          },
-        ]);
-        index++;
-      }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [isStreaming]);
-
-  const getTypeIcon = (type: ThoughtEntry["type"]) => {
+  const getTypeIcon = (type: EventType) => {
     switch (type) {
       case "thought":
         return <Brain className="w-3.5 h-3.5" />;
@@ -245,14 +54,18 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
         return <Eye className="w-3.5 h-3.5" />;
       case "checkpoint":
         return <Zap className="w-3.5 h-3.5" />;
+      case "tool_use":
+        return <Wrench className="w-3.5 h-3.5" />;
       case "error":
         return <AlertCircle className="w-3.5 h-3.5" />;
       case "success":
         return <CheckCircle2 className="w-3.5 h-3.5" />;
+      default:
+        return <Brain className="w-3.5 h-3.5" />;
     }
   };
 
-  const getTypeStyles = (type: ThoughtEntry["type"]) => {
+  const getTypeStyles = (type: EventType) => {
     switch (type) {
       case "thought":
         return "text-violet-400 bg-violet-500/10 border-violet-500/20";
@@ -262,14 +75,18 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
         return "text-cyan-400 bg-cyan-500/10 border-cyan-500/20";
       case "checkpoint":
         return "text-amber-400 bg-amber-500/10 border-amber-500/20";
+      case "tool_use":
+        return "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
       case "error":
         return "text-red-400 bg-red-500/10 border-red-500/20";
       case "success":
         return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+      default:
+        return "text-gray-400 bg-gray-500/10 border-gray-500/20";
     }
   };
 
-  const getAgentLabel = (agent: ThoughtEntry["agent"]) => {
+  const getAgentLabel = (agent: AgentType) => {
     switch (agent) {
       case "orchestrator":
         return "Orchestrator";
@@ -279,10 +96,20 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
         return "CUA: Product";
       case "claude_parser":
         return "Claude Parser";
+      case "sage_api":
+        return "SAGE API";
+      case "zoho_item_agent":
+        return "Zoho: Items";
+      case "zoho_quote_agent":
+        return "Zoho: Quote";
+      case "calculator_agent":
+        return "Calculator";
+      default:
+        return agent;
     }
   };
 
-  const getAgentColor = (agent: ThoughtEntry["agent"]) => {
+  const getAgentColor = (agent: AgentType) => {
     switch (agent) {
       case "orchestrator":
         return "text-purple-400";
@@ -292,16 +119,45 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
         return "text-blue-400";
       case "claude_parser":
         return "text-orange-400";
+      case "sage_api":
+        return "text-teal-400";
+      case "zoho_item_agent":
+        return "text-rose-400";
+      case "zoho_quote_agent":
+        return "text-pink-400";
+      case "calculator_agent":
+        return "text-yellow-400";
+      default:
+        return "text-gray-400";
     }
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
+  const formatTime = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      });
+    } catch {
+      return "--:--:--";
+    }
+  };
+
+  const formatDetails = (thought: ThoughtEntry): string | null => {
+    if (thought.details) {
+      return Object.entries(thought.details)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(" | ");
+    }
+    if (thought.metadata) {
+      return Object.entries(thought.metadata)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(" | ");
+    }
+    return null;
   };
 
   return (
@@ -321,14 +177,22 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
               Agent Reasoning Stream
             </span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-              Chain of Thought • Live
+              {activeJobId
+                ? `Job: ${activeJobId.slice(0, 12)}...`
+                : "No active job"}
             </span>
           </div>
           {/* Streaming indicator */}
           {isStreaming && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-              STREAMING
+              LIVE
+            </div>
+          )}
+          {isLoading && !isStreaming && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              LOADING
             </div>
           )}
         </div>
@@ -367,6 +231,16 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
               ref={scrollRef}
               className="max-h-[300px] overflow-y-auto p-3 space-y-2 font-mono text-xs bg-black/20"
             >
+              {thoughts.length === 0 && !isLoading && (
+                <div className="text-center text-muted-foreground py-8">
+                  <Brain className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No agent activity yet</p>
+                  <p className="text-[10px] mt-1">
+                    Thoughts will appear here when a job starts
+                  </p>
+                </div>
+              )}
+
               {thoughts.map((thought, index) => (
                 <motion.div
                   key={thought.id}
@@ -386,10 +260,10 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
                   {/* Type badge */}
                   <div
                     className={`shrink-0 p-1 rounded border ${getTypeStyles(
-                      thought.type
+                      thought.event_type
                     )}`}
                   >
-                    {getTypeIcon(thought.type)}
+                    {getTypeIcon(thought.event_type)}
                   </div>
 
                   {/* Content */}
@@ -404,9 +278,9 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
                       </span>
                       <span className="text-foreground">{thought.content}</span>
                     </div>
-                    {thought.details && (
+                    {formatDetails(thought) && (
                       <p className="text-muted-foreground/70 text-[10px] pl-0">
-                        → {thought.details}
+                        → {formatDetails(thought)}
                       </p>
                     )}
                   </div>
@@ -420,6 +294,14 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
                   <span className="text-[10px]">Agent processing...</span>
                 </div>
               )}
+
+              {/* Error display */}
+              {error && (
+                <div className="flex items-center gap-2 text-red-400 pt-2">
+                  <AlertCircle className="w-3 h-3" />
+                  <span className="text-[10px]">{error}</span>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -429,9 +311,13 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
       {isCollapsed && (
         <div className="px-4 py-3 text-xs text-muted-foreground flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Loader2 className="w-3 h-3 animate-spin text-violet-400" />
+            {isStreaming && (
+              <Loader2 className="w-3 h-3 animate-spin text-violet-400" />
+            )}
             <span>
-              {thoughts[thoughts.length - 1]?.content.slice(0, 60)}...
+              {thoughts.length > 0
+                ? thoughts[thoughts.length - 1]?.content.slice(0, 60) + "..."
+                : "No agent activity"}
             </span>
           </div>
           <span className="text-[10px] text-muted-foreground/60">

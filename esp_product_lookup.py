@@ -37,6 +37,13 @@ from config import (
     ESP_PLUS_URL,
 )
 
+# Import JobStateManager for state updates (optional dependency)
+try:
+    from job_state import JobStateManager, WorkflowStatus
+except ImportError:
+    JobStateManager = None
+    WorkflowStatus = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -493,11 +500,12 @@ class ESPProductLookup:
         dry_run: bool = False,
         product_index: int = 1,
         total_products: int = 1,
-        is_first_product: bool = True
+        is_first_product: bool = True,
+        state_manager: Optional["JobStateManager"] = None
     ):
         """
         Initialize the ESP Product Lookup agent.
-        
+
         Args:
             products: List of products to look up (each should have 'cpn' or 'sku' and 'name')
             job_id: Unique job identifier for organizing files
@@ -507,6 +515,7 @@ class ESPProductLookup:
             product_index: Current product index (1-based) for progress tracking
             total_products: Total number of products being processed
             is_first_product: If True, include full login instructions in prompt
+            state_manager: Optional JobStateManager for state updates
         """
         self.products = self._normalize_products(products)
         self.job_id = job_id
@@ -516,9 +525,10 @@ class ESPProductLookup:
         self.product_index = product_index
         self.total_products = total_products
         self.is_first_product = is_first_product
-        
+        self.state_manager = state_manager
+
         self.computer: Optional[Computer] = None
-        
+
         # Set API keys in environment
         os.environ["ORGO_API_KEY"] = os.getenv("ORGO_API_KEY", "")
         os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY", "")
@@ -537,31 +547,46 @@ class ESPProductLookup:
                 description=p.get("description")
             ))
         return normalized
+
+    def _update_state(self, status: str, **kwargs) -> None:
+        """Update job state if state manager is available."""
+        if self.state_manager and WorkflowStatus:
+            self.state_manager.update(status, **kwargs)
     
     def run(self) -> LookupResult:
         """
         Execute the product lookup workflow.
-        
+
         For single-product runs (recommended), uses the optimized single-product prompt.
         For batch runs (legacy), uses the multi-product prompt.
-        
+
         Returns:
             LookupResult with download statistics and file paths
         """
         is_single_product = len(self.products) == 1
-        
+
         logger.info("=" * 60)
         logger.info("ESP PRODUCT LOOKUP AGENT")
         logger.info("=" * 60)
         logger.info(f"Job ID: {self.job_id}")
         logger.info(f"Product {self.product_index}/{self.total_products}" if is_single_product else f"Products to process: {len(self.products)}")
+
+        # Emit state update with per-product progress
         if is_single_product:
+            product_name = self.products[0].name
             logger.info(f"CPN: {self.products[0].cpn}")
-            logger.info(f"Name: {self.products[0].name}")
+            logger.info(f"Name: {product_name}")
+            self._update_state(
+                WorkflowStatus.ESP_LOOKING_UP_PRODUCTS.value if WorkflowStatus else "esp_looking_up_products",
+                current_item=self.product_index,
+                total_items=self.total_products,
+                current_item_name=product_name
+            )
+
         logger.info(f"Upload URLs configured: {len(self.upload_url_map)}")
         logger.info(f"Dry run: {self.dry_run}")
         logger.info(f"First product (full login): {self.is_first_product}")
-        
+
         if self.dry_run:
             logger.info("[DRY RUN] Skipping CUA execution")
             return LookupResult(
@@ -570,7 +595,7 @@ class ESPProductLookup:
                 failed=len(self.products),
                 errors=[{"sku": p.cpn, "message": "Dry run mode"} for p in self.products]
             )
-        
+
         if not self.products:
             logger.warning("No products to process")
             return LookupResult(
@@ -578,12 +603,26 @@ class ESPProductLookup:
                 successful=0,
                 failed=0
             )
-        
+
         try:
             # Initialize Orgo computer
             logger.info(f"Connecting to Orgo computer: {self.computer_id}")
             self.computer = Computer(computer_id=self.computer_id)
             logger.info(f"Connected to: orgo-{self.computer_id}.orgo.dev")
+
+            # Emit checkpoint for CUA start
+            if self.state_manager and is_single_product:
+                product = self.products[0]
+                self.state_manager.emit_thought(
+                    agent="cua_product",
+                    event_type="checkpoint",
+                    content=f"Starting product lookup: {product.name}",
+                    metadata={
+                        "cpn": product.cpn,
+                        "product_index": self.product_index,
+                        "total_products": self.total_products
+                    }
+                )
             
             # Build the prompt - use single product prompt for sequential processing
             if is_single_product:
@@ -606,17 +645,53 @@ class ESPProductLookup:
                     upload_url_map=self.upload_url_map
                 )
             
+            # Get current product CPN for metadata
+            current_cpn = self.products[0].cpn if is_single_product else None
+
             # Define progress callback
             def progress_callback(event_type: str, event_data: Any) -> None:
                 if event_type == "text":
                     logger.info(f"Claude: {event_data}")
+                    # Emit thought for text output
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_product",
+                            event_type="thought",
+                            content=str(event_data)[:500],
+                            metadata={"cpn": current_cpn} if current_cpn else None
+                        )
                 elif event_type == "tool_use":
                     action = event_data.get('action', 'unknown')
                     logger.info(f"Action: {action}")
+                    # Emit thought for tool use
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_product",
+                            event_type="action",
+                            content=f"Executing: {action}",
+                            details=event_data,
+                            metadata={"cpn": current_cpn} if current_cpn else None
+                        )
                 elif event_type == "thinking":
                     logger.debug(f"Thinking: {event_data[:200]}...")
+                    # Emit thought for thinking
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_product",
+                            event_type="thought",
+                            content=str(event_data)[:500],
+                            metadata={"cpn": current_cpn} if current_cpn else None
+                        )
                 elif event_type == "error":
                     logger.error(f"Error: {event_data}")
+                    # Emit thought for error
+                    if self.state_manager:
+                        self.state_manager.emit_thought(
+                            agent="cua_product",
+                            event_type="error",
+                            content=str(event_data)[:500],
+                            metadata={"cpn": current_cpn} if current_cpn else None
+                        )
             
             # Execute the agent workflow
             logger.info(f"Starting CUA with model: {MODEL_ID}")
@@ -634,7 +709,21 @@ class ESPProductLookup:
             )
             
             logger.info("CUA workflow completed")
-            
+
+            # Emit success thought
+            if self.state_manager and is_single_product:
+                product = self.products[0]
+                self.state_manager.emit_thought(
+                    agent="cua_product",
+                    event_type="success",
+                    content=f"Product lookup complete: {product.name}",
+                    metadata={
+                        "cpn": product.cpn,
+                        "product_index": self.product_index,
+                        "total_products": self.total_products
+                    }
+                )
+
             # The agent should have uploaded files to S3 via curl
             # We assume success based on prompt completion
             # The orchestrator will verify files exist in S3
@@ -647,7 +736,7 @@ class ESPProductLookup:
                 }
                 for p in self.products
             ]
-            
+
             return LookupResult(
                 total_products=len(self.products),
                 successful=len(self.products),  # Optimistic - orchestrator verifies
@@ -658,6 +747,15 @@ class ESPProductLookup:
             
         except Exception as e:
             logger.error(f"Lookup failed: {e}", exc_info=True)
+            # Log error to state manager
+            if self.state_manager:
+                product_id = self.products[0].cpn if self.products else None
+                self.state_manager.add_error(
+                    step="esp_looking_up_products",
+                    message=str(e),
+                    product_id=product_id,
+                    recoverable=True  # Individual product failures are recoverable
+                )
             return LookupResult(
                 total_products=len(self.products),
                 successful=0,

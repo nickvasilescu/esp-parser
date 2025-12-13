@@ -37,6 +37,7 @@ from config import (
     get_config_summary,
 )
 from output_normalizer import normalize_output, detect_source
+from job_state import JobStateManager, WorkflowStatus
 
 # Zoho integration (optional - only import if needed)
 ZOHO_AVAILABLE = False
@@ -284,7 +285,8 @@ def merge_presentation_and_product_data(
 
 def run_sage_pipeline(
     url: str,
-    dry_run: bool = False
+    dry_run: bool = False,
+    state_manager: Optional[JobStateManager] = None
 ) -> Dict[str, Any]:
     """
     Execute the SAGE pipeline.
@@ -307,7 +309,7 @@ def run_sage_pipeline(
     logger.info("SAGE PIPELINE")
     logger.info("=" * 60)
     logger.info(f"URL: {url}")
-    
+
     if dry_run:
         logger.info("[DRY RUN] Would process SAGE presentation")
         return {
@@ -315,14 +317,23 @@ def run_sage_pipeline(
             "error": "Dry run mode",
             "pipeline": "sage"
         }
-    
+
+    # Emit state: calling SAGE API
+    if state_manager:
+        state_manager.update(WorkflowStatus.SAGE_CALLING_API.value)
+
     # Initialize and run SAGE handler
     # SAGEHandler uses SAGE Connect API with defaults from environment/hardcoded values
     handler = SAGEHandler(
-        presentation_url=url
+        presentation_url=url,
+        state_manager=state_manager
     )
-    
+
     result = handler.process()
+
+    # Emit state: parsing response
+    if state_manager:
+        state_manager.update(WorkflowStatus.SAGE_PARSING_RESPONSE.value)
     
     if not result.success:
         return {
@@ -375,7 +386,8 @@ def run_esp_pipeline(
     computer_id: Optional[str] = None,
     dry_run: bool = False,
     skip_cua: bool = False,
-    limit_products: Optional[int] = None
+    limit_products: Optional[int] = None,
+    state_manager: Optional[JobStateManager] = None
 ) -> Dict[str, Any]:
     """
     Execute the ESP pipeline.
@@ -429,9 +441,13 @@ def run_esp_pipeline(
     logger.info("=" * 60)
     logger.info("STEP 1: DOWNLOAD ESP PRESENTATION PDF")
     logger.info("=" * 60)
-    
+
+    # Emit state: downloading presentation
+    if state_manager:
+        state_manager.update(WorkflowStatus.ESP_DOWNLOADING_PRESENTATION.value)
+
     presentation_pdf_path = None
-    
+
     if dry_run:
         logger.info("[DRY RUN] Skipping presentation download")
     elif skip_cua:
@@ -459,14 +475,20 @@ def run_esp_pipeline(
             job_id=job_id,
             upload_url=upload_url,
             computer_id=computer_id,
-            dry_run=dry_run
+            dry_run=dry_run,
+            state_manager=state_manager
         )
         
         download_result = downloader.run()
         
         if download_result.success:
             logger.info(f"Presentation PDF uploaded to S3: {download_result.remote_path}")
-            
+
+            # Emit state: uploading to S3
+            if state_manager:
+                state_manager.update(WorkflowStatus.ESP_UPLOADING_TO_S3.value)
+                state_manager.set_link("presentation_pdf", download_result.remote_path)
+
             # Download the file from S3 to local
             try:
                 local_path = str(pdfs_dir / "presentation.pdf")
@@ -492,7 +514,11 @@ def run_esp_pipeline(
     logger.info("=" * 60)
     logger.info("STEP 2: PARSE PRESENTATION PDF")
     logger.info("=" * 60)
-    
+
+    # Emit state: parsing presentation
+    if state_manager:
+        state_manager.update(WorkflowStatus.ESP_PARSING_PRESENTATION.value)
+
     products_to_lookup = []
     presentation_data = {
         "url": url,
@@ -505,18 +531,37 @@ def run_esp_pipeline(
     if presentation_pdf_path:
         try:
             anthropic_client = Anthropic()
-            
+
             logger.info(f"Parsing presentation PDF: {presentation_pdf_path}")
+
+            # Emit thought for Claude parser starting
+            if state_manager:
+                state_manager.emit_thought(
+                    agent="claude_parser",
+                    event_type="action",
+                    content="Analyzing presentation PDF to extract product list",
+                    metadata={"pdf_path": presentation_pdf_path}
+                )
+
             parsed_presentation = process_pdf(
                 presentation_pdf_path,
                 anthropic_client,
                 PRESENTATION_EXTRACTION_PROMPT,
                 max_tokens=32768  # Opus 4.5 supports up to 64k output tokens
             )
-            
+
             # Extract products list
             products_to_lookup = parsed_presentation.get("products", [])
             logger.info(f"Found {len(products_to_lookup)} products in presentation")
+
+            # Emit success thought
+            if state_manager:
+                state_manager.emit_thought(
+                    agent="claude_parser",
+                    event_type="success",
+                    content=f"Extracted {len(products_to_lookup)} products from presentation",
+                    details={"product_count": len(products_to_lookup)}
+                )
             
             # Apply product limit if specified (useful for testing)
             if limit_products is not None and limit_products > 0:
@@ -561,7 +606,15 @@ def run_esp_pipeline(
     logger.info("=" * 60)
     logger.info("STEP 3: DOWNLOAD PRODUCT PDFs FROM ESP+")
     logger.info("=" * 60)
-    
+
+    # Emit state: looking up products
+    if state_manager and products_to_lookup:
+        state_manager.update(
+            WorkflowStatus.ESP_LOOKING_UP_PRODUCTS.value,
+            current_item=0,
+            total_items=len(products_to_lookup)
+        )
+
     downloaded_product_pdfs = []
     products_dir = pdfs_dir / "products"
     products_dir.mkdir(parents=True, exist_ok=True)
@@ -601,7 +654,16 @@ def run_esp_pipeline(
             logger.info(f"PRODUCT {idx}/{total_products}: {cpn}")
             logger.info(f"Name: {product_name}")
             logger.info("-" * 60)
-            
+
+            # Emit per-product progress
+            if state_manager:
+                state_manager.update(
+                    WorkflowStatus.ESP_LOOKING_UP_PRODUCTS.value,
+                    current_item=idx,
+                    total_items=total_products,
+                    current_item_name=product_name
+                )
+
             if not cpn:
                 logger.warning(f"Skipping product {idx} - no CPN/SKU found")
                 errors.append({
@@ -626,7 +688,8 @@ def run_esp_pipeline(
                     dry_run=dry_run,
                     product_index=idx,
                     total_products=total_products,
-                    is_first_product=(idx == 1)  # Only first product needs full login
+                    is_first_product=(idx == 1),  # Only first product needs full login
+                    state_manager=state_manager
                 )
                 
                 # Run the CUA agent for this product
@@ -663,6 +726,10 @@ def run_esp_pipeline(
         logger.info(f"  Failed: {failed_uploads}")
         logger.info("=" * 60)
         
+        # Emit state: downloading products from S3
+        if state_manager:
+            state_manager.update(WorkflowStatus.ESP_DOWNLOADING_PRODUCTS.value)
+
         # Batch download all successfully uploaded product PDFs from S3
         try:
             downloaded_files = s3_handler.download_directory("products", str(products_dir))
@@ -683,9 +750,17 @@ def run_esp_pipeline(
     logger.info("=" * 60)
     logger.info("STEP 4: PARSE PRODUCT PDFs")
     logger.info("=" * 60)
-    
+
+    # Emit state: parsing products
+    if state_manager and downloaded_product_pdfs:
+        state_manager.update(
+            WorkflowStatus.ESP_PARSING_PRODUCTS.value,
+            current_item=0,
+            total_items=len(downloaded_product_pdfs)
+        )
+
     parsed_products = []
-    
+
     if downloaded_product_pdfs:
         anthropic_client = Anthropic()
         total_pdfs = len(downloaded_product_pdfs)
@@ -694,7 +769,24 @@ def run_esp_pipeline(
         
         for idx, pdf_path in enumerate(downloaded_product_pdfs, 1):
             logger.info(f"Parsing [{idx}/{total_pdfs}]: {pdf_path}")
-            
+            pdf_stem = Path(pdf_path).stem
+
+            # Emit per-PDF progress
+            if state_manager:
+                state_manager.update(
+                    WorkflowStatus.ESP_PARSING_PRODUCTS.value,
+                    current_item=idx,
+                    total_items=total_pdfs,
+                    current_item_name=pdf_stem
+                )
+                # Emit thought for starting parse
+                state_manager.emit_thought(
+                    agent="claude_parser",
+                    event_type="action",
+                    content=f"Parsing distributor report: {pdf_stem}",
+                    metadata={"pdf_index": idx, "total_pdfs": total_pdfs}
+                )
+
             try:
                 parsed_data = process_pdf(
                     pdf_path,
@@ -705,9 +797,28 @@ def run_esp_pipeline(
                 product_name = parsed_data.get('item', {}).get('name', 'Unknown')
                 logger.info(f"  ✓ Success: {product_name}")
                 successful_parses += 1
-                
+
+                # Emit success thought
+                if state_manager:
+                    state_manager.emit_thought(
+                        agent="claude_parser",
+                        event_type="success",
+                        content=f"Extracted data for: {product_name}",
+                        metadata={"pdf_index": idx, "product_name": product_name}
+                    )
+
             except Exception as e:
                 logger.error(f"  ✗ Failed: {e}")
+
+                # Emit error thought
+                if state_manager:
+                    state_manager.emit_thought(
+                        agent="claude_parser",
+                        event_type="error",
+                        content=f"Failed to parse: {pdf_stem}",
+                        details={"error": str(e)}
+                    )
+
                 # Add to parsed_products with error flag
                 parsed_products.append({
                     "error": str(e),
@@ -731,7 +842,20 @@ def run_esp_pipeline(
     logger.info("=" * 60)
     logger.info("STEP 5: MERGE PRESENTATION & PRODUCT DATA")
     logger.info("=" * 60)
-    
+
+    # Emit state: merging data
+    if state_manager:
+        state_manager.update(WorkflowStatus.ESP_MERGING_DATA.value)
+        state_manager.emit_thought(
+            agent="orchestrator",
+            event_type="checkpoint",
+            content="Merging presentation sell prices with distributor net costs",
+            metadata={
+                "presentation_products": len(products_to_lookup),
+                "distributor_products": len(parsed_products)
+            }
+        )
+
     # CRITICAL MERGE:
     # - Presentation PDF (prompt_presentation.py) = SELL PRICE (what customer sees)
     # - Distributor Report (prompt.py) = NET COST (what distributor pays)
@@ -825,13 +949,23 @@ class Orchestrator:
         
         # Generate or use provided job ID
         self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
+
         # Detect presentation type
         self.presentation_type = detect_presentation_type(url)
-        
+
         # Ensure output directory exists
         Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
-        
+
+        # Initialize state manager for dashboard tracking
+        self.state_manager = JobStateManager(
+            job_id=self.job_id,
+            output_dir=Path(OUTPUT_DIR),
+            platform=self.presentation_type.value.upper() if self.presentation_type != PresentationType.UNKNOWN else "",
+            zoho_upload=zoho_upload,
+            zoho_quote=zoho_quote,
+            calculator=calculator,
+        )
+
         logger.info(get_config_summary())
     
     def run(self) -> Dict[str, Any]:
@@ -850,16 +984,28 @@ class Orchestrator:
         logger.info(f"Dry Run: {self.dry_run}")
         logger.info(f"Skip CUA: {self.skip_cua}")
         logger.info(f"Limit Products: {self.limit_products or 'ALL'}")
-        
+
+        # Emit checkpoint for orchestrator start
+        self.state_manager.emit_thought(
+            agent="orchestrator",
+            event_type="checkpoint",
+            content=f"Starting {self.presentation_type.value.upper()} pipeline",
+            metadata={"job_id": self.job_id, "url": self.url}
+        )
+
+        # Emit state: detecting source
+        self.state_manager.update(WorkflowStatus.DETECTING_SOURCE.value)
+
         # Validate config if needed
         if not self.dry_run and self.presentation_type == PresentationType.ESP:
             validate_config()
-        
+
         # Route to appropriate pipeline
         if self.presentation_type == PresentationType.SAGE:
             result = run_sage_pipeline(
                 url=self.url,
-                dry_run=self.dry_run
+                dry_run=self.dry_run,
+                state_manager=self.state_manager
             )
         elif self.presentation_type == PresentationType.ESP:
             result = run_esp_pipeline(
@@ -868,7 +1014,8 @@ class Orchestrator:
                 computer_id=self.computer_id,
                 dry_run=self.dry_run,
                 skip_cua=self.skip_cua,
-                limit_products=self.limit_products
+                limit_products=self.limit_products,
+                state_manager=self.state_manager
             )
         else:
             logger.error(f"Unknown presentation type for URL: {self.url}")
@@ -880,11 +1027,14 @@ class Orchestrator:
         # Normalize output to unified schema
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         pipeline_name = self.presentation_type.value
-        
+
         logger.info("=" * 60)
         logger.info("NORMALIZING OUTPUT TO UNIFIED SCHEMA")
         logger.info("=" * 60)
-        
+
+        # Emit state: normalizing
+        self.state_manager.update(WorkflowStatus.NORMALIZING.value)
+
         try:
             # Normalize to unified format for downstream Zoho/Calculator workflows
             normalized_result = normalize_output(result, source=pipeline_name)
@@ -893,13 +1043,19 @@ class Orchestrator:
             logger.warning(f"Normalization failed: {e}. Saving raw output.")
             normalized_result = result
         
+        # Emit state: saving output
+        self.state_manager.update(WorkflowStatus.SAVING_OUTPUT.value)
+
         # Save normalized (unified) output
         output_filename = f"unified_output_{pipeline_name}_{timestamp}.json"
         output_path = Path(OUTPUT_DIR) / output_filename
-        
+
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(normalized_result, f, indent=2, ensure_ascii=False)
-        
+
+        # Set output JSON link
+        self.state_manager.set_link("output_json", str(output_path))
+
         logger.info(f"Unified output saved to: {output_path}")
         
         # Also save raw output for debugging/reference
@@ -926,9 +1082,12 @@ class Orchestrator:
                 try:
                     # Validate Zoho configuration
                     validate_zoho_config()
-                    
-                    # Create and run agent
-                    zoho_agent = ZohoItemMasterAgent()
+
+                    # Emit state: searching customer
+                    self.state_manager.update(WorkflowStatus.ZOHO_SEARCHING_CUSTOMER.value)
+
+                    # Create and run agent (agent will emit more granular states internally)
+                    zoho_agent = ZohoItemMasterAgent(state_manager=self.state_manager)
                     zoho_result = zoho_agent.process_unified_output(
                         normalized_result,
                         dry_run=self.zoho_dry_run
@@ -973,6 +1132,9 @@ class Orchestrator:
                     # Validate Zoho configuration
                     validate_zoho_config()
 
+                    # Emit state: creating quote
+                    self.state_manager.update(WorkflowStatus.ZOHO_CREATING_QUOTE.value)
+
                     # Build item_master_map from previous upload results
                     item_master_map = {}
                     if zoho_result and hasattr(zoho_result, 'items'):
@@ -982,7 +1144,7 @@ class Orchestrator:
                         logger.info(f"Item Master map: {len(item_master_map)} entries for linking")
 
                     # Create and run quote agent
-                    quote_agent = ZohoQuoteAgent()
+                    quote_agent = ZohoQuoteAgent(state_manager=self.state_manager)
                     quote_result = quote_agent.create_quote(
                         unified_output=normalized_result,
                         item_master_map=item_master_map,
@@ -1032,11 +1194,14 @@ class Orchestrator:
                 logger.error("Calculator Generator not available. Install calculator_generator module.")
             else:
                 try:
+                    # Emit state: generating calculator
+                    self.state_manager.update(WorkflowStatus.CALC_GENERATING.value)
+
                     # Import zoho_client for WorkDrive upload
                     from zoho_client import ZohoClient
                     zoho_client = ZohoClient()
 
-                    calc_agent = CalculatorGeneratorAgent(zoho_client=zoho_client)
+                    calc_agent = CalculatorGeneratorAgent(zoho_client=zoho_client, state_manager=self.state_manager)
                     calc_result = calc_agent.generate_calculator(
                         unified_output=normalized_result,
                         output_dir=self.output_dir,
@@ -1072,6 +1237,29 @@ class Orchestrator:
                         "success": False,
                         "error": str(e)
                     }
+
+        # Emit final state: completed
+        has_errors = len(normalized_result.get('errors', [])) > 0
+        has_products = len(normalized_result.get('products', [])) > 0
+
+        if has_errors and has_products:
+            self.state_manager.complete(WorkflowStatus.PARTIAL_SUCCESS.value)
+        elif has_errors and not has_products:
+            self.state_manager.complete(WorkflowStatus.ERROR.value)
+        else:
+            self.state_manager.complete(WorkflowStatus.COMPLETED.value)
+
+        # Emit completion thought
+        self.state_manager.emit_thought(
+            agent="orchestrator",
+            event_type="success",
+            content=f"Pipeline complete: {len(normalized_result.get('products', []))} products processed",
+            metadata={
+                "pipeline": pipeline_name,
+                "products": len(normalized_result.get('products', [])),
+                "errors": len(normalized_result.get('errors', []))
+            }
+        )
 
         # Summary
         logger.info("=" * 60)

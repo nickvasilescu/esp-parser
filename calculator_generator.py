@@ -19,6 +19,13 @@ from openpyxl.styles import Font, PatternFill, Border, Side
 
 from zoho_config import ZOHO_QUOTE_DEFAULTS
 
+# Import JobStateManager for state updates (optional dependency)
+try:
+    from job_state import JobStateManager, WorkflowStatus
+except ImportError:
+    JobStateManager = None
+    WorkflowStatus = None
+
 
 # =============================================================================
 # Result Types
@@ -130,13 +137,15 @@ class CalculatorGeneratorAgent:
         anthropic_client=None,
         model: str = "claude-sonnet-4-20250514",
         max_tokens: int = 4096,
-        max_iterations: int = 10
+        max_iterations: int = 10,
+        state_manager: Optional["JobStateManager"] = None
     ):
         self.zoho_client = zoho_client
         self.anthropic = anthropic_client or anthropic.Anthropic()
         self.model = model
         self.max_tokens = max_tokens
         self.max_iterations = max_iterations
+        self.state_manager = state_manager
 
         # State
         self._unified_output: Dict[str, Any] = {}
@@ -144,6 +153,11 @@ class CalculatorGeneratorAgent:
         self._agent_complete: bool = False
         self._generated_file_path: Optional[str] = None
         self._output_dir: str = "./output"
+
+    def _update_state(self, status: str, **kwargs) -> None:
+        """Update job state if state manager is available."""
+        if self.state_manager and WorkflowStatus:
+            self.state_manager.update(status, **kwargs)
 
     def generate_calculator(
         self,
@@ -289,6 +303,19 @@ Product summary:
 
     def _tool_generate_xlsx(self, tool_input: Dict) -> str:
         """Tool handler: Generate the Excel spreadsheet."""
+        # Emit state: generating calculator
+        self._update_state(
+            WorkflowStatus.CALC_GENERATING.value if WorkflowStatus else "calc_generating"
+        )
+
+        # Emit thought for generating calculator
+        if self.state_manager:
+            self.state_manager.emit_thought(
+                agent="calculator_agent",
+                event_type="action",
+                content="Generating cost calculator spreadsheet"
+            )
+
         file_name = tool_input.get("file_name", "Calculator")
         # Clean filename
         file_name = "".join(c for c in file_name if c.isalnum() or c in " -_").strip()
@@ -314,6 +341,19 @@ Product summary:
         if not self.zoho_client:
             return json.dumps({"success": False, "error": "Zoho client not configured"})
 
+        # Emit state: uploading calculator
+        self._update_state(
+            WorkflowStatus.CALC_UPLOADING.value if WorkflowStatus else "calc_uploading"
+        )
+
+        # Emit thought for uploading calculator
+        if self.state_manager:
+            self.state_manager.emit_thought(
+                agent="calculator_agent",
+                event_type="action",
+                content="Uploading calculator to Zoho WorkDrive"
+            )
+
         try:
             result = self.zoho_client.upload_to_cost_calculators(file_path)
             file_id = result.get("id")
@@ -337,6 +377,16 @@ Product summary:
             drive_permalink=tool_input.get("permalink"),
             products_count=len(self._unified_output.get("products", []))
         )
+
+        # Emit completion thought
+        if self.state_manager:
+            self.state_manager.emit_thought(
+                agent="calculator_agent",
+                event_type="checkpoint",
+                content=f"Calculator complete: {tool_input.get('file_name')}",
+                metadata={"permalink": tool_input.get("permalink")}
+            )
+
         return json.dumps({"success": True, "message": "Completion recorded"})
 
     def _build_price_formula(self, breaks: List[Dict], qty_cell_ref: str) -> str:
