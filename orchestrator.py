@@ -44,10 +44,10 @@ ZOHO_AVAILABLE = False
 ZOHO_QUOTE_AVAILABLE = False
 try:
     from zoho_item_agent import ZohoItemMasterAgent, AgentResult
-    from zoho_config import validate_zoho_config
+    from zoho_config import validate_zoho_config, ZOHO_ORG_ID
     ZOHO_AVAILABLE = True
 except ImportError:
-    pass
+    ZOHO_ORG_ID = None
 
 try:
     from zoho_quote_agent import ZohoQuoteAgent, QuoteResult
@@ -1171,6 +1171,11 @@ class Orchestrator:
                     if quote_result.success:
                         total_str = f"${quote_result.total_amount:.2f}" if quote_result.total_amount else "N/A"
                         logger.info(f"Quote created: {quote_result.estimate_number} ({total_str})")
+
+                        # Set the Zoho quote link in job state
+                        if quote_result.estimate_id and ZOHO_ORG_ID:
+                            quote_url = f"https://books.zoho.com/app/{ZOHO_ORG_ID}/estimates/{quote_result.estimate_id}"
+                            self.state_manager.set_link("zoho_quote", quote_url)
                     else:
                         logger.error(f"Quote creation failed: {quote_result.error}")
 

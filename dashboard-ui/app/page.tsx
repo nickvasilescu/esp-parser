@@ -45,29 +45,27 @@ export default function Home() {
   // ==========================================================================
 
   // 1. QUOTES GENERATED (cumulative)
-  // Count jobs that have a Zoho quote link (quote was successfully created)
+  // Count jobs that have completed with zoho_quote enabled
+  // (Backend doesn't always set zoho_quote_link, so infer from status + feature flag)
   const quotesGenerated = allJobs.filter(
-    (job) => job.zoho_quote_link !== null
+    (job) =>
+      job.zoho_quote_link !== null ||
+      ((job.status === "completed" || job.status === "partial_success") &&
+        job.features.zoho_quote)
   ).length;
 
-  // 2. HOURS SAVED (based on actual workflow runtime)
-  // Sum of (updated_at - started_at) for completed/partial_success jobs
-  const completedJobs = allJobs.filter(
-    (job) => job.status === "completed" || job.status === "partial_success"
-  );
-  const totalRuntimeMs = completedJobs.reduce((acc, job) => {
-    const start = new Date(job.started_at).getTime();
-    const end = new Date(job.updated_at).getTime();
-    return acc + (end - start);
-  }, 0);
-  const hoursSaved = (totalRuntimeMs / (1000 * 60 * 60)).toFixed(1);
-
-  // 3. PRODUCTS PARSED (cumulative)
+  // 2. PRODUCTS PARSED (cumulative)
   // Sum of total_items across all jobs that have it
   const productsParsed = allJobs.reduce(
     (acc, job) => acc + (job.total_items || 0),
     0
   );
+
+  // 3. HOURS SAVED (estimated human effort saved)
+  // Estimate 15-20 minutes saved per product for manual quoting
+  // Using 15 min as a conservative estimate
+  const MINUTES_PER_PRODUCT = 15;
+  const hoursSaved = ((productsParsed * MINUTES_PER_PRODUCT) / 60).toFixed(1);
 
   // 4. SUCCESS RATE
   // (completed + partial_success) / (completed + partial_success + error) × 100

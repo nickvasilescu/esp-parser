@@ -40,6 +40,20 @@ function formatTime(isoString: string): string {
   return `${displayHours}:${displayMinutes} ${ampm}`;
 }
 
+// Format relative time for job display
+function formatRelativeTime(isoString: string): string {
+  const now = Date.now();
+  const then = new Date(isoString).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${Math.floor(diffHours / 24)}d ago`;
+}
+
 // Format status for display
 function formatStatus(status: string): string {
   return status
@@ -88,16 +102,15 @@ export default function JobsTable({
             <tr>
               <th className="px-4 py-3 w-[180px]">Status</th>
               <th className="px-4 py-3">Platform</th>
-              <th className="px-4 py-3">Job ID</th>
-              <th className="px-4 py-3 w-[200px]">Progress</th>
               <th className="px-4 py-3">Started</th>
+              <th className="px-4 py-3 w-[200px]">Progress</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {jobs.length === 0 && !isLoading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                   No active workflows
                 </td>
               </tr>
@@ -121,12 +134,18 @@ export default function JobsTable({
                     <span className="font-medium">{job.platform}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" suppressHydrationWarning>
                   <div className="flex flex-col">
-                    <span className="font-mono text-xs text-foreground">
-                      {job.id}
+                    <span className="text-sm font-medium text-foreground">
+                      {formatRelativeTime(job.started_at)}
                     </span>
-                    <div className="flex gap-1 mt-1">
+                    <div className="flex items-center gap-1 mt-1">
+                      <span
+                        className="text-[10px] text-muted-foreground font-mono cursor-help"
+                        title={job.id}
+                      >
+                        {job.id.slice(-8)}
+                      </span>
                       {job.features.zoho_upload && (
                         <span className="text-[9px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded">
                           Zoho
@@ -157,12 +176,6 @@ export default function JobsTable({
                       </span>
                     )}
                   </div>
-                </td>
-                <td
-                  className="px-4 py-3 text-muted-foreground"
-                  suppressHydrationWarning
-                >
-                  {formatTime(job.started_at)}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md opacity-0 group-hover:opacity-100 transition-all">

@@ -36,6 +36,7 @@ export function useActiveJob(pollInterval: number = 2000) {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [allJobs, setAllJobs] = useState<JobFromAPI[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStale, setIsStale] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -54,11 +55,24 @@ export function useActiveJob(pollInterval: number = 2000) {
         "awaiting_qa",
       ];
 
-      // Find the first job that is not in a terminal state (most recent active)
-      const active = jobs.find((job) => !terminalStates.includes(job.status));
+      // Consider a job "stale" if not updated in 2 minutes (likely terminated abnormally)
+      const STALE_THRESHOLD_MS = 2 * 60 * 1000;
+      const now = Date.now();
 
-      setActiveJob(active || null);
+      // Find the first non-terminal job
+      const nonTerminalJob = jobs.find((job) => !terminalStates.includes(job.status));
+
+      // Check if that job is stale
+      const jobIsStale = nonTerminalJob
+        ? now - new Date(nonTerminalJob.updated_at).getTime() > STALE_THRESHOLD_MS
+        : false;
+
+      // Only set as active if not stale
+      const active = nonTerminalJob && !jobIsStale ? nonTerminalJob : null;
+
+      setActiveJob(active);
       setActiveJobId(active?.id || null);
+      setIsStale(jobIsStale);
     } catch (err) {
       console.error("Error fetching jobs:", err);
     }
@@ -74,7 +88,7 @@ export function useActiveJob(pollInterval: number = 2000) {
     return () => clearInterval(interval);
   }, [fetchJobs, pollInterval]);
 
-  return { activeJob, activeJobId, allJobs, isLoading };
+  return { activeJob, activeJobId, allJobs, isLoading, isStale };
 }
 
 export default useActiveJob;

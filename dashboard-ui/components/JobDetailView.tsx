@@ -3,7 +3,6 @@ import StatusBadge from "./StatusBadge";
 import ProgressBar from "./ProgressBar";
 import {
   X,
-  ExternalLink,
   FileText,
   Calculator,
   ShoppingCart,
@@ -11,6 +10,14 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  Download,
+  Search,
+  FileSearch,
+  FileOutput,
+  Upload,
+  Globe,
+  Circle,
+  Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -41,6 +48,124 @@ interface JobFromAPI {
 interface JobDetailViewProps {
   job: JobFromAPI;
   onClose: () => void;
+}
+
+// Workflow step definition
+interface WorkflowStep {
+  status: string;
+  name: string;
+  icon: React.ReactNode;
+}
+
+// Get workflow steps based on platform and features
+function getWorkflowSteps(
+  platform: string,
+  features: { zoho_upload: boolean; zoho_quote: boolean; calculator: boolean }
+): WorkflowStep[] {
+  const steps: WorkflowStep[] = [
+    { status: "queued", name: "Queued", icon: <Circle className="w-3.5 h-3.5" /> },
+    { status: "detecting_source", name: "Detecting Source", icon: <Search className="w-3.5 h-3.5" /> },
+  ];
+
+  if (platform === "SAGE") {
+    steps.push(
+      { status: "sage_calling_api", name: "Calling SAGE API", icon: <Globe className="w-3.5 h-3.5" /> },
+      { status: "sage_enriching_products", name: "Enriching Products", icon: <Package className="w-3.5 h-3.5" /> }
+    );
+  } else {
+    // ESP workflow
+    steps.push(
+      { status: "esp_downloading_presentation", name: "Downloading Presentation", icon: <Download className="w-3.5 h-3.5" /> },
+      { status: "esp_uploading_to_s3", name: "Uploading to S3", icon: <Upload className="w-3.5 h-3.5" /> },
+      { status: "esp_parsing_presentation", name: "Parsing Presentation", icon: <FileSearch className="w-3.5 h-3.5" /> },
+      { status: "esp_looking_up_products", name: "Looking Up Products", icon: <Search className="w-3.5 h-3.5" /> },
+      { status: "esp_parsing_products", name: "Parsing Products", icon: <FileText className="w-3.5 h-3.5" /> }
+    );
+  }
+
+  steps.push(
+    { status: "normalizing", name: "Normalizing Data", icon: <FileOutput className="w-3.5 h-3.5" /> }
+  );
+
+  if (features.zoho_upload) {
+    steps.push({ status: "zoho_uploading_items", name: "Uploading to Zoho", icon: <Upload className="w-3.5 h-3.5" /> });
+  }
+
+  if (features.zoho_quote) {
+    steps.push({ status: "zoho_creating_quote", name: "Creating Quote", icon: <ShoppingCart className="w-3.5 h-3.5" /> });
+  }
+
+  if (features.calculator) {
+    steps.push({ status: "calc_generating", name: "Generating Calculator", icon: <Calculator className="w-3.5 h-3.5" /> });
+  }
+
+  steps.push({ status: "completed", name: "Completed", icon: <CheckCircle2 className="w-3.5 h-3.5" /> });
+
+  return steps;
+}
+
+// Get the index of the current step
+function getCurrentStepIndex(steps: WorkflowStep[], currentStatus: string): number {
+  const idx = steps.findIndex((s) => s.status === currentStatus);
+  // If status not found in steps (might be in error or partial_success), find the closest match
+  if (idx === -1) {
+    if (currentStatus === "error" || currentStatus === "partial_success") {
+      // Find where we were before the error
+      return steps.length - 1; // Assume we were at the end
+    }
+    return 0;
+  }
+  return idx;
+}
+
+// Workflow Pipeline Component
+function WorkflowPipeline({ status, platform, features }: {
+  status: string;
+  platform: string;
+  features: { zoho_upload: boolean; zoho_quote: boolean; calculator: boolean };
+}) {
+  const steps = getWorkflowSteps(platform, features);
+  const currentIndex = getCurrentStepIndex(steps, status);
+  const isComplete = status === "completed" || status === "partial_success";
+  const isError = status === "error";
+
+  return (
+    <div className="space-y-1">
+      {steps.map((step, idx) => {
+        const isCompleted = idx < currentIndex || (isComplete && idx === steps.length - 1);
+        const isCurrent = idx === currentIndex && !isComplete && !isError;
+        const isPending = idx > currentIndex || (isError && idx >= currentIndex);
+
+        return (
+          <div
+            key={step.status}
+            className={`flex items-center gap-3 px-3 py-2 rounded-md transition-all ${
+              isCompleted
+                ? "bg-emerald-500/10 text-emerald-400"
+                : isCurrent
+                ? "bg-blue-500/10 text-blue-400 border border-blue-500/30"
+                : isError && idx === currentIndex
+                ? "bg-red-500/10 text-red-400 border border-red-500/30"
+                : "bg-secondary/30 text-muted-foreground opacity-50"
+            }`}
+          >
+            <div className="shrink-0">
+              {isCompleted ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : isCurrent ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isError && idx === currentIndex ? (
+                <AlertCircle className="w-3.5 h-3.5" />
+              ) : (
+                step.icon
+              )}
+            </div>
+            <span className="text-xs font-medium">{step.name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
@@ -153,6 +278,18 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
             </div>
           </section>
 
+          {/* Workflow Pipeline */}
+          <section>
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+              Workflow Pipeline
+            </h3>
+            <WorkflowPipeline
+              status={job.status}
+              platform={job.platform}
+              features={job.features}
+            />
+          </section>
+
           {/* Timeline */}
           <section>
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
@@ -195,137 +332,8 @@ export default function JobDetailView({ job, onClose }: JobDetailViewProps) {
               </div>
             </section>
           )}
-
-          {/* Generated Artifacts */}
-          <section>
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
-              Generated Artifacts
-            </h3>
-            <div className="space-y-2">
-              <ArtifactLink
-                label="Presentation PDF"
-                url={job.presentation_pdf_url}
-                icon={<FileText className="w-4 h-4" />}
-              />
-              <ArtifactLink
-                label="Output JSON"
-                url={job.output_json_url}
-                icon={<FileText className="w-4 h-4" />}
-              />
-            </div>
-          </section>
-
-          {/* Zoho Integration Links */}
-          <section>
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
-              Zoho Integration
-            </h3>
-            <div className="space-y-2">
-              <ResourceLink
-                label="Zoho Item Master"
-                url={job.zoho_item_link}
-                icon={<FileText className="w-4 h-4" />}
-                disabled={!job.zoho_item_link}
-              />
-              <ResourceLink
-                label="Price Calculator"
-                url={job.calculator_link}
-                icon={<Calculator className="w-4 h-4" />}
-                disabled={!job.calculator_link}
-              />
-              <ResourceLink
-                label="Zoho Quote"
-                url={job.zoho_quote_link}
-                icon={<ShoppingCart className="w-4 h-4" />}
-                disabled={!job.zoho_quote_link}
-                highlight
-              />
-            </div>
-          </section>
         </div>
       </motion.div>
     </div>
-  );
-}
-
-function ArtifactLink({
-  label,
-  url,
-  icon,
-}: {
-  label: string;
-  url: string | null;
-  icon: React.ReactNode;
-}) {
-  if (!url) {
-    return (
-      <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/10 opacity-50">
-        <div className="flex items-center gap-3">
-          {icon}
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        <span className="text-xs text-muted-foreground">Not generated</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30">
-      <div className="flex items-center gap-3">
-        {icon}
-        <div>
-          <span className="text-sm font-medium block">{label}</span>
-          <span className="text-xs text-muted-foreground font-mono truncate block max-w-[200px]">
-            {url.split("/").pop()}
-          </span>
-        </div>
-      </div>
-      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-    </div>
-  );
-}
-
-function ResourceLink({
-  label,
-  url,
-  icon,
-  disabled,
-  highlight,
-}: {
-  label: string;
-  url: string | null;
-  icon: React.ReactNode;
-  disabled?: boolean;
-  highlight?: boolean;
-}) {
-  if (disabled) {
-    return (
-      <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/10 opacity-50 cursor-not-allowed">
-        <div className="flex items-center gap-3">
-          {icon}
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        <span className="text-xs">Pending</span>
-      </div>
-    );
-  }
-
-  return (
-    <a
-      href={url!}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-        highlight
-          ? "bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-500"
-          : "bg-card border-border hover:bg-secondary text-foreground"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {icon}
-        <span className="text-sm font-medium">{label}</span>
-      </div>
-      <ExternalLink className="w-4 h-4 opacity-50" />
-    </a>
   );
 }

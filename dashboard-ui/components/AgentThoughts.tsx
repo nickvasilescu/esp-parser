@@ -32,10 +32,10 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Get active job and poll for its thoughts
-  const { activeJobId } = useActiveJob();
+  const { activeJobId, isStale } = useActiveJob();
   const { thoughts, isLoading, error } = useThoughtsPolling(activeJobId);
 
-  const isStreaming = activeJobId !== null && thoughts.length > 0;
+  const isStreaming = activeJobId !== null && thoughts.length > 0 && !isStale;
 
   // Auto-scroll to bottom when new thoughts arrive
   useEffect(() => {
@@ -189,7 +189,13 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
               LIVE
             </div>
           )}
-          {isLoading && !isStreaming && (
+          {isStale && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              STALE
+            </div>
+          )}
+          {isLoading && !isStreaming && !isStale && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
               <Loader2 className="w-3 h-3 animate-spin" />
               LOADING
@@ -313,6 +319,9 @@ export default function AgentThoughts({ className }: AgentThoughtsProps) {
           <div className="flex items-center gap-2">
             {isStreaming && (
               <Loader2 className="w-3 h-3 animate-spin text-violet-400" />
+            )}
+            {isStale && (
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
             )}
             <span>
               {thoughts.length > 0
