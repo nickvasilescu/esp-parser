@@ -1,0 +1,18 @@
+[Unit]
+Description=Promo Pipeline Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/promo-pipeline/dashboard-ui
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=10
+Environment=PORT=3000
+Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

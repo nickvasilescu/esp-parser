@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import ssl
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -231,8 +232,19 @@ class SAGEAPIClient:
         if self.session_id:
             cookies[f"{acct_id}AdminSessionID"] = self.session_id
             cookies["DefaultAdminSessionID"] = self.session_id
-        
-        self._client = httpx.Client(timeout=60.0, cookies=cookies)
+
+        # Create SSL context with legacy cipher support for older SAGE servers
+        # OpenSSL 3.0 defaults are too strict for promoplace.com
+        ssl_context = ssl.create_default_context()
+        ssl_context.set_ciphers('DEFAULT:@SECLEVEL=1')
+        # Load system CA certificates
+        try:
+            import certifi
+            ssl_context.load_verify_locations(certifi.where())
+        except ImportError:
+            pass  # Fall back to system certificates
+
+        self._client = httpx.Client(timeout=60.0, cookies=cookies, verify=ssl_context)
     
     def _build_auth(self) -> Dict[str, Any]:
         """Build authentication object for API requests."""

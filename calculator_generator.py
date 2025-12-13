@@ -107,8 +107,9 @@ CALCULATOR_AGENT_SYSTEM_PROMPT = """You are a Calculator Generator agent.
 ## Workflow
 
 STEP 1: Call generate_calculator_xlsx
-- File name format: "{ClientName} Promo Calc {Year}"
-- Example: "Otava Promo Calc 2026"
+- File name format: "{ClientName} Promo Calc {YYYYMMDD_HHMMSS}"
+- Example: "Otava Promo Calc 20251213_143022"
+- This ensures each calculator is saved as a new file, not overwriting existing ones
 - Clean the client name (remove special characters)
 
 STEP 2: Call upload_to_cost_calculators
@@ -212,7 +213,7 @@ Product summary:
         if dry_run:
             # Clean client name for filename
             clean_name = "".join(c for c in client_name if c.isalnum() or c in " -_").strip()
-            file_name = f"{clean_name} Promo Calc {datetime.now().year}"
+            file_name = f"{clean_name} Promo Calc {datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
             try:
                 file_path = self._generate_xlsx(file_name)

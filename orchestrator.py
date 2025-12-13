@@ -918,7 +918,8 @@ class Orchestrator:
         zoho_dry_run: bool = False,
         zoho_quote: bool = False,
         calculator: bool = False,
-        output_dir: str = OUTPUT_DIR
+        output_dir: str = OUTPUT_DIR,
+        client_email: Optional[str] = None
     ):
         """
         Initialize the orchestrator.
@@ -935,6 +936,7 @@ class Orchestrator:
             zoho_quote: If True, create draft quote in Zoho Books after Item Master upload
             calculator: If True, generate client calculator Excel and upload to Zoho WorkDrive
             output_dir: Directory for output files
+            client_email: Optional client email for Zoho contact lookup
         """
         self.url = url
         self.computer_id = computer_id
@@ -946,6 +948,7 @@ class Orchestrator:
         self.zoho_quote = zoho_quote
         self.calculator = calculator
         self.output_dir = output_dir
+        self.client_email = client_email
         
         # Generate or use provided job ID
         self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -1087,7 +1090,10 @@ class Orchestrator:
                     self.state_manager.update(WorkflowStatus.ZOHO_SEARCHING_CUSTOMER.value)
 
                     # Create and run agent (agent will emit more granular states internally)
-                    zoho_agent = ZohoItemMasterAgent(state_manager=self.state_manager)
+                    zoho_agent = ZohoItemMasterAgent(
+                        state_manager=self.state_manager,
+                        client_email=self.client_email
+                    )
                     zoho_result = zoho_agent.process_unified_output(
                         normalized_result,
                         dry_run=self.zoho_dry_run
@@ -1439,6 +1445,12 @@ Environment Variables:
         help="Generate client calculator spreadsheet and upload to Zoho WorkDrive"
     )
 
+    parser.add_argument(
+        "--client-email",
+        type=str,
+        help="Client email address for Zoho contact lookup (passed from email trigger)"
+    )
+
     args = parser.parse_args()
     
     # Set logging level
@@ -1463,7 +1475,8 @@ Environment Variables:
         zoho_upload=zoho_upload,
         zoho_dry_run=args.zoho_dry_run,
         zoho_quote=args.zoho_quote,
-        calculator=args.calculator
+        calculator=args.calculator,
+        client_email=args.client_email
     )
     
     try:

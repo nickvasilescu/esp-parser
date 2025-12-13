@@ -324,7 +324,8 @@ class ZohoItemMasterAgent:
         thinking_budget: int = ZOHO_AGENT_THINKING_BUDGET,
         max_tokens: int = ZOHO_AGENT_MAX_TOKENS,
         max_iterations: int = ZOHO_AGENT_MAX_ITERATIONS,
-        state_manager: Optional["JobStateManager"] = None
+        state_manager: Optional["JobStateManager"] = None,
+        client_email: Optional[str] = None
     ):
         """
         Initialize the agent.
@@ -337,6 +338,7 @@ class ZohoItemMasterAgent:
             max_tokens: Max tokens for responses
             max_iterations: Max tool use iterations
             state_manager: Optional JobStateManager for state updates
+            client_email: Optional client email for Zoho contact lookup
         """
         self.zoho_client = zoho_client or create_zoho_client()
         self.anthropic = anthropic_client or Anthropic()
@@ -345,6 +347,7 @@ class ZohoItemMasterAgent:
         self.max_tokens = max_tokens
         self.max_iterations = max_iterations
         self.state_manager = state_manager
+        self.client_email = client_email
 
         # State for current processing session
         self._unified_output: Optional[Dict[str, Any]] = None
@@ -944,6 +947,17 @@ class ZohoItemMasterAgent:
         
         return agent_result
     
+    def _get_client_email_instruction(self) -> str:
+        """Get instruction for client email lookup if available."""
+        if self.client_email:
+            return f"""
+## **IMPORTANT: Client Email for Contact Lookup**
+Use this email address to search for the Zoho contact: **{self.client_email}**
+Search using the `search_contact` tool with this email to find the correct client account number for SKU prefixes.
+
+"""
+        return ""
+
     def _build_initial_message(self, unified_output: Dict[str, Any]) -> str:
         """Build the initial message for Claude with unified output context."""
         products = unified_output.get("products", [])
@@ -984,7 +998,7 @@ Product {i}: {item.get('name', 'Unknown')}
 ## Presenter Information
 - Name: {presenter.get('name') or 'N/A'}
 - Company: {presenter.get('company') or 'N/A'}
-
+{self._get_client_email_instruction()}
 ## Products to Upload
 {"".join(product_summaries)}
 

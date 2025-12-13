@@ -1,0 +1,22 @@
+{
+  "job_id": "esp_20251212_233226",
+  "status": "completed",
+  "platform": "SAGE",
+  "progress": 100,
+  "current_item": 14,
+  "total_items": 14,
+  "current_item_name": "Port & Co\u2122 Tri-Blend Tee.",
+  "features": {
+    "zoho_upload": true,
+    "zoho_quote": true,
+    "calculator": true
+  },
+  "started_at": "2025-12-13T07:32:26.850916Z",
+  "updated_at": "2025-12-13T07:34:15.884232Z",
+  "presentation_pdf_url": null,
+  "output_json_url": "output/unified_output_sage_20251212_233243.json",
+  "zoho_item_link": null,
+  "zoho_quote_link": null,
+  "calculator_link": null,
+  "errors": []
+}
