@@ -60,7 +60,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 echo "[5/7] Setting up dashboard..."
-cd "$PROJECT_DIR/dashboard-ui"
+cd "$PROJECT_DIR/frontend"
 npm install
 npm run build
 
