@@ -214,3 +214,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ===========================================
+# Project-specific patterns for promo_parser
+# ===========================================
+
+# Output directory (runtime artifacts)
+output/
+
+# Frontend (Next.js) - keep node_modules ignored
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/*.log
+
+# Log files
+*.log
+run.log
+zoho_agent.log
+
+# Local development
+.env.local
+.env.*.local

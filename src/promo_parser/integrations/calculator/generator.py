@@ -17,11 +17,11 @@ import anthropic
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side
 
-from zoho_config import ZOHO_QUOTE_DEFAULTS
+from promo_parser.integrations.zoho.config import ZOHO_QUOTE_DEFAULTS
 
 # Import JobStateManager for state updates (optional dependency)
 try:
-    from job_state import JobStateManager, WorkflowStatus
+    from promo_parser.core.state import JobStateManager, WorkflowStatus
 except ImportError:
     JobStateManager = None
     WorkflowStatus = None

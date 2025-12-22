@@ -4,14 +4,14 @@ Generic PDF Processor - Extract structured data from PDFs using Claude with swap
 
 This module provides a reusable PDF processing pipeline that can be configured with
 different system prompts for various extraction tasks:
-- Product sell sheets (using prompt.py)
-- ESP presentation PDFs (using prompt_presentation.py)
+- Product sell sheets (using prompts/product.py)
+- ESP presentation PDFs (using prompts/presentation.py)
 - Any other PDF extraction task
 
 Usage:
-    from pdf_processor import process_pdf
-    from prompt import EXTRACTION_PROMPT
-    
+    from promo_parser.extraction.processor import process_pdf
+    from promo_parser.extraction.prompts.product import EXTRACTION_PROMPT
+
     result = process_pdf("file.pdf", client, system_prompt=EXTRACTION_PROMPT)
 """
 
@@ -320,7 +320,7 @@ def process_product_sellsheet(
     Returns:
         Extracted product data as a dictionary
     """
-    from prompt import EXTRACTION_PROMPT
+    from promo_parser.extraction.prompts.product import EXTRACTION_PROMPT
     return process_pdf(pdf_path, client, EXTRACTION_PROMPT, model)
 
 
@@ -340,6 +340,6 @@ def process_presentation_pdf(
     Returns:
         Extracted presentation data with product list
     """
-    from prompt_presentation import PRESENTATION_EXTRACTION_PROMPT
+    from promo_parser.extraction.prompts.presentation import PRESENTATION_EXTRACTION_PROMPT
     return process_pdf(pdf_path, client, PRESENTATION_EXTRACTION_PROMPT, model)
 

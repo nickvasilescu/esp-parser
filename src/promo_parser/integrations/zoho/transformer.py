@@ -19,7 +19,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from zoho_config import ZOHO_ITEM_DEFAULTS, CUSTOM_FIELD_PATTERNS
+from promo_parser.integrations.zoho.config import ZOHO_ITEM_DEFAULTS, CUSTOM_FIELD_PATTERNS
 
 logger = logging.getLogger(__name__)
 

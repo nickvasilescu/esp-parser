@@ -20,8 +20,8 @@ from typing import Optional
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
-from prompt import EXTRACTION_PROMPT
-from pdf_processor import (
+from promo_parser.extraction.prompts.product import EXTRACTION_PROMPT
+from promo_parser.extraction.processor import (
     process_pdf,
     save_json_output,
     process_directory as _process_directory

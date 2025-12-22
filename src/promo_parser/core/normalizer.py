@@ -18,7 +18,7 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from unified_schema import (
+from promo_parser.core.schema import (
     UnifiedOutput, UnifiedMetadata, UnifiedClient, UnifiedPresenter,
     UnifiedProduct, UnifiedIdentifiers, UnifiedItem, UnifiedVendor,
     UnifiedAddress, UnifiedPricing, UnifiedPriceBreak, UnifiedFee,

@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from orgo import Computer
 
-from config import (
+from promo_parser.core.config import (
     ORGO_COMPUTER_ID,
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
@@ -35,7 +35,7 @@ from config import (
 
 # Import JobStateManager for state updates (optional dependency)
 try:
-    from job_state import JobStateManager, WorkflowStatus
+    from promo_parser.core.state import JobStateManager, WorkflowStatus
 except ImportError:
     JobStateManager = None
     WorkflowStatus = None

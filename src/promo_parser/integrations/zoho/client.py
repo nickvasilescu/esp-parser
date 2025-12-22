@@ -15,7 +15,7 @@ from urllib.parse import urljoin
 
 import requests
 
-from zoho_config import (
+from promo_parser.integrations.zoho.config import (
     ZOHO_ORG_ID,
     ZOHO_CLIENT_ID,
     ZOHO_CLIENT_SECRET,

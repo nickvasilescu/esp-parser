@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 
 from anthropic import Anthropic
 
-from config import (
+from promo_parser.core.config import (
     validate_config,
     OUTPUT_DIR,
     SAGE_PRESENTATION_DOMAIN,
@@ -36,21 +36,21 @@ from config import (
     SAGE_API_SECRET,
     get_config_summary,
 )
-from output_normalizer import normalize_output, detect_source
-from job_state import JobStateManager, WorkflowStatus
+from promo_parser.core.normalizer import normalize_output, detect_source
+from promo_parser.core.state import JobStateManager, WorkflowStatus
 
 # Zoho integration (optional - only import if needed)
 ZOHO_AVAILABLE = False
 ZOHO_QUOTE_AVAILABLE = False
 try:
-    from zoho_item_agent import ZohoItemMasterAgent, AgentResult
-    from zoho_config import validate_zoho_config, ZOHO_ORG_ID
+    from promo_parser.integrations.zoho.item_agent import ZohoItemMasterAgent, AgentResult
+    from promo_parser.integrations.zoho.config import validate_zoho_config, ZOHO_ORG_ID
     ZOHO_AVAILABLE = True
 except ImportError:
     ZOHO_ORG_ID = None
 
 try:
-    from zoho_quote_agent import ZohoQuoteAgent, QuoteResult
+    from promo_parser.integrations.zoho.quote_agent import ZohoQuoteAgent, QuoteResult
     ZOHO_QUOTE_AVAILABLE = True
 except ImportError:
     pass
@@ -58,7 +58,7 @@ except ImportError:
 # Calculator Generator (optional - for client-facing Excel calculators)
 CALCULATOR_AVAILABLE = False
 try:
-    from calculator_generator import CalculatorGeneratorAgent, CalculatorResult
+    from promo_parser.integrations.calculator.generator import CalculatorGeneratorAgent, CalculatorResult
     CALCULATOR_AVAILABLE = True
 except ImportError:
     pass
@@ -303,7 +303,7 @@ def run_sage_pipeline(
     Returns:
         Final output dictionary
     """
-    from sage_handler import SAGEHandler
+    from promo_parser.pipelines.sage.handler import SAGEHandler
     
     logger.info("=" * 60)
     logger.info("SAGE PIPELINE")
@@ -412,13 +412,13 @@ def run_esp_pipeline(
     Returns:
         Final output dictionary
     """
-    from esp_presentation_downloader import ESPPresentationDownloader
-    from esp_product_lookup import ESPProductLookup
-    from pdf_processor import process_pdf, process_presentation_pdf
-    from prompt import EXTRACTION_PROMPT
-    from prompt_presentation import PRESENTATION_EXTRACTION_PROMPT
-    from orgo_file_handler import OrgoFileHandler
-    from config import ORGO_COMPUTER_ID
+    from promo_parser.pipelines.esp.downloader import ESPPresentationDownloader
+    from promo_parser.pipelines.esp.lookup import ESPProductLookup
+    from promo_parser.extraction.processor import process_pdf, process_presentation_pdf
+    from promo_parser.extraction.prompts.product import EXTRACTION_PROMPT
+    from promo_parser.extraction.prompts.presentation import PRESENTATION_EXTRACTION_PROMPT
+    from promo_parser.pipelines.esp.file_handler import OrgoFileHandler
+    from promo_parser.core.config import ORGO_COMPUTER_ID
     
     logger.info("=" * 60)
     logger.info("ESP PIPELINE")
@@ -1218,7 +1218,7 @@ class Orchestrator:
                     self.state_manager.update(WorkflowStatus.CALC_GENERATING.value)
 
                     # Import zoho_client for WorkDrive upload
-                    from zoho_client import ZohoClient
+                    from promo_parser.integrations.zoho.client import ZohoClient
                     zoho_client = ZohoClient()
 
                     calc_agent = CalculatorGeneratorAgent(zoho_client=zoho_client, state_manager=self.state_manager)

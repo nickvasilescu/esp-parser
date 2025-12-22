@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional
 
 from anthropic import Anthropic
 
-from zoho_config import (
+from promo_parser.integrations.zoho.config import (
     ZOHO_AGENT_MODEL,
     ZOHO_AGENT_THINKING_BUDGET,
     ZOHO_AGENT_MAX_TOKENS,
@@ -39,8 +39,8 @@ from zoho_config import (
     ZOHO_QUOTE_DEFAULTS,
     validate_zoho_config,
 )
-from zoho_client import ZohoClient, ZohoAPIError, create_zoho_client
-from zoho_data_transformer import (
+from promo_parser.integrations.zoho.client import ZohoClient, ZohoAPIError, create_zoho_client
+from promo_parser.integrations.zoho.transformer import (
     build_estimate_payload,
     validate_estimate_payload,
     get_vendor_sku,
@@ -49,7 +49,7 @@ from zoho_data_transformer import (
 
 # Import JobStateManager for state updates (optional dependency)
 try:
-    from job_state import JobStateManager, WorkflowStatus
+    from promo_parser.core.state import JobStateManager, WorkflowStatus
 except ImportError:
     JobStateManager = None
     WorkflowStatus = None

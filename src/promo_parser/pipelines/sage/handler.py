@@ -25,7 +25,7 @@ import httpx
 
 # Import JobStateManager for state updates (optional dependency)
 try:
-    from job_state import JobStateManager, WorkflowStatus
+    from promo_parser.core.state import JobStateManager, WorkflowStatus
 except ImportError:
     JobStateManager = None
     WorkflowStatus = None
@@ -990,7 +990,7 @@ class SAGEHandler:
             SAGEResult from scraped data
         """
         try:
-            from presentation_parser import scrape as scrape_presentation
+            from promo_parser.pipelines.sage.scraper import scrape as scrape_presentation
             
             logger.info("Using web scraper for SAGE presentation...")
             presentation = scrape_presentation(self.presentation_url)

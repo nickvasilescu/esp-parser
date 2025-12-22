@@ -6,36 +6,92 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an ESP/SAGE promotional product presentation parser that extracts structured product data from PDF sell sheets. It uses Claude Opus 4.5 for PDF understanding and Orgo CUA (Computer Use Agent) for browser automation to download PDFs from vendor portals.
 
+## Installation
+
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install package in development mode
+pip install -e ".[dev]"
+```
+
 ## Common Commands
 
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
 # Run orchestrator (main entry point)
-python3 orchestrator.py <presentation_url>
+promo-parser <presentation_url>
 
 # ESP presentation example
-python3 orchestrator.py https://portal.mypromooffice.com/projects/500187876/presentations/500183020/products
+promo-parser https://portal.mypromooffice.com/projects/500187876/presentations/500183020/products
 
 # SAGE presentation example
-python3 orchestrator.py https://www.viewpresentation.com/66907679185
+promo-parser https://www.viewpresentation.com/66907679185
 
 # Test with single product (useful for debugging)
-python3 orchestrator.py <url> --limit-products 1
+promo-parser <url> --limit-products 1
 
 # Skip CUA downloads (use existing PDFs)
-python3 orchestrator.py <url> --skip-cua
+promo-parser <url> --skip-cua
 
 # Full workflow with Zoho integration
-python3 orchestrator.py <url> --zoho-upload --zoho-quote --calculator
+promo-parser <url> --zoho-upload --zoho-quote --calculator
 
 # Parse single PDF directly (bypasses orchestrator)
-python3 esp_parser.py -f product.pdf
-python3 esp_parser.py -d ./pdfs/  # Process directory
+esp-parser -f product.pdf
+esp-parser -d ./pdfs/  # Process directory
+
+# Run tests
+pytest tests/
 
 # Run dashboard UI
-cd dashboard-ui && npm run dev
+cd frontend && npm run dev
+```
+
+## Package Structure
+
+```
+promo_parser/
+├── pyproject.toml              # Package configuration
+├── src/promo_parser/
+│   ├── core/                   # Core infrastructure
+│   │   ├── config.py           # Environment variable loading
+│   │   ├── schema.py           # Unified output dataclasses
+│   │   ├── state.py            # Job state tracking
+│   │   └── normalizer.py       # ESP/SAGE → unified format
+│   │
+│   ├── extraction/             # PDF extraction
+│   │   ├── processor.py        # Claude-powered PDF→JSON
+│   │   ├── tools.py            # Agent tool definitions
+│   │   └── prompts/
+│   │       ├── product.py      # Distributor report prompt
+│   │       └── presentation.py # Presentation overview prompt
+│   │
+│   ├── pipelines/
+│   │   ├── orchestrator.py     # Main entry point
+│   │   ├── esp/                # ESP pipeline
+│   │   │   ├── downloader.py   # Orgo CUA for presentations
+│   │   │   ├── lookup.py       # Orgo CUA for product lookup
+│   │   │   ├── parser.py       # ESP PDF parser CLI
+│   │   │   └── file_handler.py # Orgo file downloads
+│   │   └── sage/               # SAGE pipeline
+│   │       ├── handler.py      # SAGE Connect API
+│   │       └── scraper.py      # Presentation scraper
+│   │
+│   └── integrations/
+│       ├── zoho/               # Zoho Books integration
+│       │   ├── config.py
+│       │   ├── client.py
+│       │   ├── transformer.py
+│       │   ├── item_agent.py
+│       │   └── quote_agent.py
+│       └── calculator/
+│           └── generator.py    # Excel calculator generation
+│
+├── tests/                      # Test suite
+├── frontend/                   # Dashboard UI (Next.js)
+└── output/                     # Runtime output (gitignored)
 ```
 
 ## Architecture
@@ -45,51 +101,51 @@ cd dashboard-ui && npm run dev
 ```
 Presentation URL
        ↓
-orchestrator.py (routes by URL domain)
+Orchestrator (routes by URL domain)
        ↓
    ┌───┴───┐
    │       │
   ESP    SAGE
    │       │
    ↓       ↓
-esp_presentation_downloader.py    sage_handler.py
-(Orgo CUA downloads PDF)          (SAGE Connect API)
+pipelines/esp/downloader.py      pipelines/sage/handler.py
+(Orgo CUA downloads PDF)         (SAGE Connect API)
    ↓
-esp_product_lookup.py
+pipelines/esp/lookup.py
 (CUA downloads each product's Distributor Report)
    ↓
-pdf_processor.py + prompt.py / prompt_presentation.py
+extraction/processor.py + prompts/{product,presentation}.py
 (Claude Opus 4.5 extracts JSON from PDFs)
    ↓
-output_normalizer.py → unified_schema.py
+core/normalizer.py → core/schema.py
 (Converts ESP/SAGE output to unified format)
    ↓
 Optional integrations:
-- zoho_item_agent.py → Zoho Item Master
-- zoho_quote_agent.py → Zoho Books quotes
-- calculator_generator.py → Excel calculators
+- integrations/zoho/item_agent.py → Zoho Item Master
+- integrations/zoho/quote_agent.py → Zoho Books quotes
+- integrations/calculator/generator.py → Excel calculators
 ```
 
 ### Key Modules
 
-- **orchestrator.py**: Main entry point, routes URLs to ESP or SAGE pipelines, manages job state
-- **pdf_processor.py**: Generic PDF→JSON extraction using Claude, supports swappable prompts
-- **prompt.py**: System prompt for extracting product sell sheet data (distributor reports)
-- **prompt_presentation.py**: System prompt for extracting presentation overview (product list with sell prices)
-- **unified_schema.py**: Dataclass definitions for normalized output format
-- **output_normalizer.py**: Transforms ESP/SAGE output to unified schema
-- **esp_presentation_downloader.py**: Orgo CUA agent for downloading presentation PDF
-- **esp_product_lookup.py**: Orgo CUA agent for ESP+ login and product lookup
-- **job_state.py**: Tracks workflow status for dashboard visualization
-- **config.py**: Environment variable loading and validation
+- **pipelines/orchestrator.py**: Main entry point, routes URLs to ESP or SAGE pipelines, manages job state
+- **extraction/processor.py**: Generic PDF→JSON extraction using Claude, supports swappable prompts
+- **extraction/prompts/product.py**: System prompt for extracting product sell sheet data (distributor reports)
+- **extraction/prompts/presentation.py**: System prompt for extracting presentation overview (product list with sell prices)
+- **core/schema.py**: Dataclass definitions for normalized output format
+- **core/normalizer.py**: Transforms ESP/SAGE output to unified schema
+- **pipelines/esp/downloader.py**: Orgo CUA agent for downloading presentation PDF
+- **pipelines/esp/lookup.py**: Orgo CUA agent for ESP+ login and product lookup
+- **core/state.py**: Tracks workflow status for dashboard visualization
+- **core/config.py**: Environment variable loading and validation
 
 ### Pricing Data Sources (Critical)
 
 The system merges two pricing sources:
-- **sell_price**: From presentation PDF (what customer sees) - parsed via `prompt_presentation.py`
-- **net_cost**: From distributor report PDF (what distributor pays) - parsed via `prompt.py`
+- **sell_price**: From presentation PDF (what customer sees) - parsed via `extraction/prompts/presentation.py`
+- **net_cost**: From distributor report PDF (what distributor pays) - parsed via `extraction/prompts/product.py`
 
-Products are matched by CPN (Customer Product Number) during merge in `orchestrator.py:merge_presentation_and_product_data()`.
+Products are matched by CPN (Customer Product Number) during merge in `pipelines/orchestrator.py:merge_presentation_and_product_data()`.
 
 ## Environment Variables
 
