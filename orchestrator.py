@@ -391,22 +391,24 @@ def run_esp_pipeline(
 ) -> Dict[str, Any]:
     """
     Execute the ESP pipeline.
-    
+
     Flow:
-    1. CUA downloads presentation PDF from portal.mypromooffice.com and uploads to S3
-    2. pdf_processor extracts product list from presentation PDF
-    3. CUA logs into ESP+ and downloads Distributor Report for each product to S3
-    4. pdf_processor extracts full product data from each sell sheet
-    5. Return aggregated structured output
-    
+    1. CUA downloads presentation PDF from portal.mypromooffice.com to Orgo VM
+    2. Orgo File Export API retrieves the PDF for local processing
+    3. pdf_processor extracts product list from presentation PDF
+    4. CUA logs into ESP+ and downloads Distributor Report for each product to Orgo VM
+    5. Orgo File Export API retrieves each product PDF for local processing
+    6. pdf_processor extracts full product data from each sell sheet
+    7. Return aggregated structured output
+
     Args:
         url: ESP presentation URL
-        job_id: Unique job identifier for S3 organization
+        job_id: Unique job identifier for file organization
         computer_id: Orgo computer ID
         dry_run: If True, skip CUA execution
         skip_cua: If True, use existing PDFs
         limit_products: If set, only process this many products (useful for testing)
-        
+
     Returns:
         Final output dictionary
     """
@@ -415,19 +417,23 @@ def run_esp_pipeline(
     from pdf_processor import process_pdf, process_presentation_pdf
     from prompt import EXTRACTION_PROMPT
     from prompt_presentation import PRESENTATION_EXTRACTION_PROMPT
-    from s3_handler import S3Handler
+    from orgo_file_handler import OrgoFileHandler
+    from config import ORGO_COMPUTER_ID
     
     logger.info("=" * 60)
     logger.info("ESP PIPELINE")
     logger.info("=" * 60)
     logger.info(f"Job ID: {job_id}")
     logger.info(f"URL: {url}")
-    
+
     errors = []
-    
-    # Initialize S3 handler
-    s3_handler = S3Handler(job_id=job_id)
-    logger.info(f"S3 bucket: {s3_handler.bucket}")
+
+    # Use provided computer_id or default from config
+    effective_computer_id = computer_id or ORGO_COMPUTER_ID
+
+    # Initialize Orgo file handler (used after CUA completes to export files from VM)
+    file_handler = OrgoFileHandler(job_id=job_id, computer_id=effective_computer_id)
+    logger.info(f"Orgo File Handler initialized for computer: {effective_computer_id}")
     
     # Ensure output directory exists
     output_dir = Path(OUTPUT_DIR)
@@ -451,56 +457,52 @@ def run_esp_pipeline(
     if dry_run:
         logger.info("[DRY RUN] Skipping presentation download")
     elif skip_cua:
-        # Look for existing presentation PDF
+        # Look for existing presentation PDF locally first
         existing_pdfs = list(pdfs_dir.glob("presentation*.pdf"))
         if existing_pdfs:
             presentation_pdf_path = str(existing_pdfs[0])
             logger.info(f"Using existing presentation PDF: {presentation_pdf_path}")
         else:
-            # Try to download from S3
+            # Try to export from VM via Orgo API
             try:
                 local_path = str(pdfs_dir / "presentation.pdf")
-                s3_handler.download_file("presentation.pdf", local_path)
+                file_handler.download_presentation(local_path)
                 presentation_pdf_path = local_path
-                logger.info(f"Downloaded presentation PDF from S3: {local_path}")
+                logger.info(f"Exported presentation PDF from VM: {local_path}")
             except FileNotFoundError:
-                logger.warning("No existing presentation PDF found in S3")
+                logger.warning("No existing presentation PDF found on VM")
     else:
-        # Generate pre-signed upload URL for the presentation PDF
-        upload_url = s3_handler.generate_presigned_upload_url("presentation.pdf")
-        logger.info(f"Generated upload URL for presentation.pdf")
-        
+        # CUA downloads presentation to VM's local storage
         downloader = ESPPresentationDownloader(
             presentation_url=url,
             job_id=job_id,
-            upload_url=upload_url,
-            computer_id=computer_id,
+            computer_id=effective_computer_id,
             dry_run=dry_run,
             state_manager=state_manager
         )
-        
-        download_result = downloader.run()
-        
-        if download_result.success:
-            logger.info(f"Presentation PDF uploaded to S3: {download_result.remote_path}")
 
-            # Emit state: uploading to S3
+        download_result = downloader.run()
+
+        if download_result.success:
+            logger.info(f"Presentation PDF saved to VM: {download_result.remote_path}")
+
+            # Emit state: exporting from VM
             if state_manager:
-                state_manager.update(WorkflowStatus.ESP_UPLOADING_TO_S3.value)
+                state_manager.update(WorkflowStatus.ESP_DOWNLOADING_PRODUCTS.value)
                 state_manager.set_link("presentation_pdf", download_result.remote_path)
 
-            # Download the file from S3 to local
+            # Export the file from VM via Orgo API
             try:
                 local_path = str(pdfs_dir / "presentation.pdf")
-                s3_handler.download_file("presentation.pdf", local_path)
+                file_handler.download_presentation(local_path)
                 presentation_pdf_path = local_path
-                logger.info(f"Downloaded presentation PDF from S3 to: {local_path}")
+                logger.info(f"Exported presentation PDF from VM to: {local_path}")
             except Exception as e:
                 errors.append({
-                    "step": "presentation_download_s3",
-                    "message": f"Failed to download from S3: {str(e)}"
+                    "step": "presentation_export",
+                    "message": f"Failed to export from VM: {str(e)}"
                 })
-                logger.error(f"Failed to download presentation PDF from S3: {e}")
+                logger.error(f"Failed to export presentation PDF from VM: {e}")
         else:
             errors.append({
                 "step": "presentation_download",
@@ -628,13 +630,18 @@ def run_esp_pipeline(
             downloaded_product_pdfs = [str(p) for p in existing_pdfs]
             logger.info(f"Found {len(downloaded_product_pdfs)} existing product PDFs locally")
         else:
-            # Try to download from S3
-            try:
-                downloaded_files = s3_handler.download_directory("products", str(products_dir))
-                downloaded_product_pdfs = downloaded_files
-                logger.info(f"Downloaded {len(downloaded_product_pdfs)} product PDFs from S3")
-            except Exception as e:
-                logger.warning(f"Could not download from S3: {e}")
+            # Try to export from VM for each product (if we have products_to_lookup)
+            logger.info("Attempting to export product PDFs from VM...")
+            for product in products_to_lookup:
+                cpn = product.get("cpn") or product.get("sku") or ""
+                if cpn:
+                    try:
+                        local_path = str(products_dir / f"{cpn}_distributor_report.pdf")
+                        file_handler.download_product_pdf(cpn, local_path)
+                        downloaded_product_pdfs.append(local_path)
+                        logger.info(f"Exported {cpn} from VM")
+                    except Exception as e:
+                        logger.warning(f"Could not export {cpn} from VM: {e}")
     elif products_to_lookup:
         # =====================================================================
         # SEQUENTIAL CUA AGENT PROCESSING
@@ -675,31 +682,27 @@ def run_esp_pipeline(
                 continue
             
             try:
-                # Generate upload URL for this single product
-                upload_url_map = s3_handler.generate_product_upload_urls([cpn])
-                logger.info(f"Generated upload URL for {cpn}")
-                
                 # Create CUA agent for this single product
+                # CUA saves PDF to VM, we'll export it after all products are done
                 lookup = ESPProductLookup(
                     products=[product],
                     job_id=job_id,
-                    upload_url_map=upload_url_map,
-                    computer_id=computer_id,
+                    computer_id=effective_computer_id,
                     dry_run=dry_run,
                     product_index=idx,
                     total_products=total_products,
                     is_first_product=(idx == 1),  # Only first product needs full login
                     state_manager=state_manager
                 )
-                
+
                 # Run the CUA agent for this product
                 lookup_result = lookup.run()
-                
+
                 if lookup_result.successful > 0:
-                    logger.info(f"✓ Product {idx}/{total_products} ({cpn}): Upload successful")
+                    logger.info(f"✓ Product {idx}/{total_products} ({cpn}): Saved to VM")
                     successful_uploads += 1
                 else:
-                    logger.warning(f"✗ Product {idx}/{total_products} ({cpn}): Upload failed")
+                    logger.warning(f"✗ Product {idx}/{total_products} ({cpn}): Failed")
                     failed_uploads += 1
                     for error in lookup_result.errors:
                         errors.append({
@@ -725,22 +728,28 @@ def run_esp_pipeline(
         logger.info(f"  Successful: {successful_uploads}")
         logger.info(f"  Failed: {failed_uploads}")
         logger.info("=" * 60)
-        
-        # Emit state: downloading products from S3
+
+        # Emit state: exporting products from VM
         if state_manager:
             state_manager.update(WorkflowStatus.ESP_DOWNLOADING_PRODUCTS.value)
 
-        # Batch download all successfully uploaded product PDFs from S3
-        try:
-            downloaded_files = s3_handler.download_directory("products", str(products_dir))
-            downloaded_product_pdfs = downloaded_files
-            logger.info(f"Downloaded {len(downloaded_product_pdfs)} product PDFs from S3")
-        except Exception as e:
-            errors.append({
-                "step": "product_download_s3",
-                "message": f"Failed to download products from S3: {str(e)}"
-            })
-            logger.error(f"Failed to download product PDFs from S3: {e}")
+        # Export all product PDFs from VM via Orgo File Export API
+        logger.info("Exporting product PDFs from VM...")
+        for product in products_to_lookup:
+            cpn = product.get("cpn") or product.get("sku") or ""
+            if cpn:
+                try:
+                    local_path = str(products_dir / f"{cpn}_distributor_report.pdf")
+                    file_handler.download_product_pdf(cpn, local_path)
+                    downloaded_product_pdfs.append(local_path)
+                    logger.info(f"  ✓ Exported: {cpn}")
+                except Exception as e:
+                    errors.append({
+                        "step": "product_export",
+                        "sku": cpn,
+                        "message": f"Failed to export from VM: {str(e)}"
+                    })
+                    logger.warning(f"  ✗ Failed to export {cpn}: {e}")
     else:
         logger.warning("No products to look up")
     
@@ -1354,13 +1363,9 @@ Supported URL Patterns:
 Environment Variables:
   ORGO_API_KEY          Orgo API key (required for ESP pipeline)
   ANTHROPIC_API_KEY     Anthropic API key (required)
-  ORGO_COMPUTER_ID      Default Orgo computer ID
+  ORGO_COMPUTER_ID      Default Orgo computer ID (required for ESP pipeline)
   ESP_PLUS_EMAIL        ESP+ login email
   ESP_PLUS_PASSWORD     ESP+ login password
-  AWS_ACCESS_KEY_ID     AWS access key ID (required for ESP pipeline)
-  AWS_SECRET_ACCESS_KEY AWS secret access key (required for ESP pipeline)
-  AWS_REGION            AWS region (default: us-east-1)
-  AWS_S3_BUCKET         S3 bucket name for file storage (required for ESP pipeline)
   SAGE_API_KEY          SAGE API key (optional, for future enrichment)
   SAGE_API_SECRET       SAGE API secret (optional)
   
@@ -1387,7 +1392,7 @@ Environment Variables:
     parser.add_argument(
         "--job-id",
         type=str,
-        help="Job ID for S3 organization (auto-generated if not provided)"
+        help="Job ID for file organization (auto-generated if not provided)"
     )
     
     parser.add_argument(

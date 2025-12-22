@@ -49,28 +49,29 @@ logger = logging.getLogger(__name__)
 
 def build_download_prompt(
     presentation_url: str,
-    job_id: str,
-    upload_url: str
+    job_id: str
 ) -> str:
     """
     Build the CUA prompt for downloading an ESP presentation PDF.
-    
+
+    The prompt instructs the agent to save the PDF locally. File export
+    is handled separately via Orgo API after the CUA completes.
+
     Args:
         presentation_url: URL of the ESP presentation (portal.mypromooffice.com)
         job_id: Unique job identifier for organizing files
-        upload_url: Pre-signed S3 URL for uploading the PDF
-    
+
     Returns:
         Formatted prompt string for the CUA
     """
     working_dir = f"~/Downloads/{job_id}"
     target_file = f"{working_dir}/presentation.pdf"
-    
-    prompt = f"""You are a file download agent. Your goal is to navigate to an ESP presentation page, download the presentation as a PDF, and upload it to cloud storage.
+
+    prompt = f"""You are a file download agent. Your goal is to navigate to an ESP presentation page and download the presentation as a PDF.
 
 IMPORTANT CONTEXT:
 - You are controlling a Linux desktop environment
-- Firefox browser is available
+- Google Chrome browser is available
 - You have Terminal access for file operations
 - Job ID: {job_id}
 - Working directory: {working_dir}
@@ -90,7 +91,7 @@ PHASE 1: SETUP WORKING DIRECTORY
    ls -la ~/Downloads/
 
 PHASE 2: NAVIGATE TO PRESENTATION
-1. Open Firefox browser
+1. Open Google Chrome browser
 2. Navigate to: {presentation_url}
 3. Wait for the page to fully load
 4. Take a screenshot to confirm the presentation is visible
@@ -101,7 +102,7 @@ PHASE 3: DOWNLOAD THE PDF
    - It may be in a toolbar, header, or as an action button
 2. Click the download button
 3. Wait for the download to complete
-   - Firefox will show a download popup/notification
+   - Chrome will show a download bar at the bottom
    - The download typically goes to ~/Downloads by default
 4. Take a screenshot to confirm download completed
 
@@ -115,20 +116,10 @@ PHASE 4: IDENTIFY AND MOVE THE FILE
 5. Verify the file exists:
    ls -la {target_file}
 
-PHASE 5: UPLOAD TO S3
-1. Upload the file using curl:
-   curl -X PUT -H "Content-Type: application/pdf" -T {target_file} '{upload_url}'
-2. Verify the upload succeeded (HTTP 200 response)
-3. If curl is not available or fails, use Python as fallback:
-   python3 -c "import urllib.request; data=open('{target_file}','rb').read(); req=urllib.request.Request('{upload_url}',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
-
-PHASE 6: VERIFY AND REPORT
-1. Take a screenshot showing the upload succeeded
-2. Call `report_downloaded_pdf` with:
-   - sku: "presentation"
-   - remote_path: "s3://{job_id}/presentation.pdf"
-   - product_name: "ESP Presentation PDF"
-3. Call `report_completion` to signal you are done
+PHASE 5: COMPLETION
+1. Take a final screenshot showing the file exists
+2. Confirm the file is at: {target_file}
+3. Your task is complete
 
 =============================================================================
 IMPORTANT COMMANDS REFERENCE
@@ -143,11 +134,8 @@ Find newest PDF in Downloads:
 Move file to working directory:
   mv "$(ls -t ~/Downloads/*.pdf | head -1)" {target_file}
 
-Upload to S3 (using curl):
-  curl -X PUT -H "Content-Type: application/pdf" -T {target_file} '{upload_url}'
-
-Upload to S3 (using Python - if curl is unavailable):
-  python3 -c "import urllib.request; data=open('{target_file}','rb').read(); req=urllib.request.Request('{upload_url}',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
+Verify file exists:
+  ls -la {target_file}
 
 =============================================================================
 TROUBLESHOOTING
@@ -155,7 +143,7 @@ TROUBLESHOOTING
 
 If you encounter issues:
 
-1. **Page doesn't load**: 
+1. **Page doesn't load**:
    - Try refreshing the page
    - Check if a login is required (if so, log the error)
 
@@ -172,28 +160,9 @@ If you encounter issues:
    - List all files: ls -la ~/Downloads/
    - Look for recently modified files: ls -lt ~/Downloads/ | head -5
 
-5. **curl upload fails or command not found**:
-   - If curl not found, use the Python fallback command above
-   - Check the error message
-   - Verify the file exists: ls -la {target_file}
-   - Retry the upload command
-
-6. **Login required**:
+5. **Login required**:
    - Call `log_error` with details about the login requirement
    - We may need to handle authentication separately
-
-=============================================================================
-AVAILABLE TOOLS
-=============================================================================
-
-1. `report_downloaded_pdf` - Report a successfully downloaded PDF
-   Required: sku, remote_path, product_name
-
-2. `log_error` - Log an error encountered
-   Required: sku, message
-
-3. `report_completion` - Report that the task is complete
-   Required: total_processed, successful, failed
 
 =============================================================================
 BEGIN WORKFLOW
@@ -201,7 +170,7 @@ BEGIN WORKFLOW
 
 Start by taking a screenshot to see the current state of the desktop, then proceed with Phase 1 (Setup Working Directory).
 """
-    
+
     return prompt
 
 
@@ -221,16 +190,16 @@ class DownloadResult:
 class ESPPresentationDownloader:
     """
     CUA Agent for downloading ESP presentation PDFs.
-    
-    This agent navigates to portal.mypromooffice.com presentation URLs,
-    downloads the presentation as a PDF, and uploads it to S3.
+
+    This agent navigates to portal.mypromooffice.com presentation URLs
+    and downloads the presentation as a PDF to the VM's local storage.
+    File export is handled separately via Orgo API after the CUA completes.
     """
-    
+
     def __init__(
         self,
         presentation_url: str,
         job_id: str,
-        upload_url: str,
         computer_id: Optional[str] = None,
         dry_run: bool = False,
         state_manager: Optional["JobStateManager"] = None
@@ -241,14 +210,12 @@ class ESPPresentationDownloader:
         Args:
             presentation_url: URL of the ESP presentation
             job_id: Unique job identifier for organizing files
-            upload_url: Pre-signed S3 URL for uploading the PDF
             computer_id: Optional Orgo computer ID (defaults to ORGO_COMPUTER_ID)
             dry_run: If True, don't execute the CUA
             state_manager: Optional JobStateManager for state updates
         """
         self.presentation_url = presentation_url
         self.job_id = job_id
-        self.upload_url = upload_url
         self.computer_id = computer_id or ORGO_COMPUTER_ID
         self.dry_run = dry_run
         self.state_manager = state_manager
@@ -276,7 +243,7 @@ class ESPPresentationDownloader:
         logger.info("=" * 60)
         logger.info(f"Job ID: {self.job_id}")
         logger.info(f"URL: {self.presentation_url}")
-        logger.info(f"Upload URL: {self.upload_url[:80]}...")
+        logger.info(f"Computer ID: {self.computer_id}")
         logger.info(f"Dry run: {self.dry_run}")
 
         if self.dry_run:
@@ -309,8 +276,7 @@ class ESPPresentationDownloader:
             # Build the prompt
             prompt = build_download_prompt(
                 presentation_url=self.presentation_url,
-                job_id=self.job_id,
-                upload_url=self.upload_url
+                job_id=self.job_id
             )
 
             # Define progress callback
@@ -323,11 +289,6 @@ class ESPPresentationDownloader:
                             agent="cua_presentation",
                             event_type="thought",
                             content=str(event_data)[:500]  # Truncate long text
-                        )
-                    # Detect upload phase from CUA output
-                    if "curl" in str(event_data).lower() and "PUT" in str(event_data):
-                        self._update_state(
-                            WorkflowStatus.ESP_UPLOADING_TO_S3.value if WorkflowStatus else "esp_uploading_to_s3"
                         )
                 elif event_type == "tool_use":
                     action = event_data.get('action', 'unknown')
@@ -381,16 +342,15 @@ class ESPPresentationDownloader:
                 self.state_manager.emit_thought(
                     agent="cua_presentation",
                     event_type="success",
-                    content="Presentation PDF downloaded and uploaded to S3",
-                    metadata={"remote_path": f"s3://{self.job_id}/presentation.pdf"}
+                    content="Presentation PDF downloaded to VM",
+                    metadata={"vm_path": f"~/Downloads/{self.job_id}/presentation.pdf"}
                 )
 
-            # The agent should have uploaded the file to S3 via curl
-            # We assume success if the prompt completed without exception
-            # The orchestrator will verify the file exists in S3
+            # The agent saved the file to the VM's local storage
+            # The orchestrator will export it via Orgo API
             return DownloadResult(
                 success=True,
-                remote_path=f"s3://{self.job_id}/presentation.pdf"
+                remote_path=f"Downloads/{self.job_id}/presentation.pdf"
             )
 
         except Exception as e:
@@ -456,28 +416,23 @@ def main():
     # Validate URL
     if "mypromooffice.com" not in args.url and "portal." not in args.url:
         print("Warning: URL does not appear to be from portal.mypromooffice.com", file=sys.stderr)
-    
+
     # Generate job ID if not provided
     job_id = args.job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    # Initialize S3 handler and generate upload URL
-    from s3_handler import S3Handler
-    s3_handler = S3Handler(job_id=job_id)
-    upload_url = s3_handler.generate_presigned_upload_url("presentation.pdf")
-    
+
     # Run downloader
     downloader = ESPPresentationDownloader(
         presentation_url=args.url,
         job_id=job_id,
-        upload_url=upload_url,
         computer_id=args.computer_id,
         dry_run=args.dry_run
     )
-    
+
     result = downloader.run()
-    
+
     if result.success:
-        print(f"Success! PDF uploaded to: {result.remote_path}")
+        print(f"Success! PDF saved to VM at: {result.remote_path}")
+        print(f"Use Orgo File Export API to retrieve the file")
     else:
         print(f"Failed: {result.error}", file=sys.stderr)
         sys.exit(1)

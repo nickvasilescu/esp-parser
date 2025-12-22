@@ -49,16 +49,10 @@ ESP_PORTAL_URL: str = os.getenv("ESP_PORTAL_URL", "https://portal.mypromooffice.
 
 
 # =============================================================================
-# AWS S3 Configuration
+# File Storage (Orgo File Export)
 # =============================================================================
-
-AWS_ACCESS_KEY_ID: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_REGION: str = os.getenv("AWS_REGION", "us-east-2")
-AWS_S3_BUCKET: Optional[str] = os.getenv("AWS_S3_BUCKET")
-
-# Pre-signed URL expiration time in seconds (default: 1 hour)
-S3_URL_EXPIRATION: int = int(os.getenv("S3_URL_EXPIRATION", "3600"))
+# Files are stored on Orgo VM and exported via Orgo API
+# No AWS S3 configuration needed - uses Orgo's native file export
 
 
 # =============================================================================
@@ -126,19 +120,9 @@ def validate_config() -> None:
     # Check required ESP Plus configuration
     if not ESP_PLUS_EMAIL:
         errors.append("ESP_PLUS_EMAIL environment variable is required")
-    
+
     if not ESP_PLUS_PASSWORD:
         errors.append("ESP_PLUS_PASSWORD environment variable is required")
-    
-    # Check required AWS S3 configuration
-    if not AWS_ACCESS_KEY_ID:
-        errors.append("AWS_ACCESS_KEY_ID environment variable is required")
-    
-    if not AWS_SECRET_ACCESS_KEY:
-        errors.append("AWS_SECRET_ACCESS_KEY environment variable is required")
-    
-    if not AWS_S3_BUCKET:
-        errors.append("AWS_S3_BUCKET environment variable is required")
     
     # Report all errors
     if errors:
@@ -155,34 +139,31 @@ def get_config_summary() -> str:
     Sensitive values are masked.
     """
     sage_api_status = "Configured" if SAGE_API_KEY else "Not configured (pending)"
-    aws_key_masked = f"{AWS_ACCESS_KEY_ID[:4]}...{AWS_ACCESS_KEY_ID[-4:]}" if AWS_ACCESS_KEY_ID and len(AWS_ACCESS_KEY_ID) > 8 else "Not set"
-    
+
     return f"""
 Multi-Source Orchestration Configuration:
   Orgo:
     - Computer ID: {ORGO_COMPUTER_ID}
     - Display: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}
-  
+
   ESP Pipeline:
     - ESP Plus URL: {ESP_PLUS_URL}
     - ESP Plus Email: {ESP_PLUS_EMAIL}
     - ESP Portal URL: {ESP_PORTAL_URL}
-  
+
   SAGE Pipeline:
     - API Status: {sage_api_status}
     - Presentation Domain: {SAGE_PRESENTATION_DOMAIN}
-  
-  AWS S3:
-    - Access Key: {aws_key_masked}
-    - Region: {AWS_REGION}
-    - Bucket: {AWS_S3_BUCKET}
-    - URL Expiration: {S3_URL_EXPIRATION}s
-  
+
+  File Storage:
+    - Method: Orgo File Export API
+    - Files saved to: ~/Downloads/{{job_id}}/
+
   Agent:
     - Model: {MODEL_ID}
     - Thinking Budget: {THINKING_BUDGET}
     - Max Iterations: {MAX_ITERATIONS}
-  
+
   Output:
     - Output Directory: {OUTPUT_DIR}
     - Remote Download Dir: {REMOTE_DOWNLOAD_DIR}

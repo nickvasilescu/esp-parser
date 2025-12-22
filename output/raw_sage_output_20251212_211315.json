@@ -1,5 +1,0 @@
-{
-  "success": false,
-  "error": "Both API and scraper failed: No module named 'bs4'",
-  "pipeline": "sage"
-}

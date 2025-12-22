@@ -78,38 +78,36 @@ class LookupResult:
 def build_single_product_prompt(
     product: ProductToLookup,
     job_id: str,
-    upload_url: str,
     product_index: int,
     total_products: int,
     is_first_product: bool = False
 ) -> str:
     """
     Build the CUA prompt for looking up a SINGLE product in ESP+.
-    
+
     This prompt is designed to be called sequentially for each product,
     with each CUA agent handling exactly one product lookup.
-    
+    The file is saved locally and exported via Orgo API after CUA completes.
+
     Args:
         product: Single product to look up
         job_id: Unique job identifier for organizing files
-        upload_url: Pre-signed S3 upload URL for this product
         product_index: Current product index (1-based)
         total_products: Total number of products being processed
         is_first_product: If True, include full login instructions
-    
+
     Returns:
         Formatted prompt string for the CUA
     """
     working_dir = f"~/Downloads/{job_id}"
     cpn = product.cpn or 'N/A'
-    
+
     # Build product info
     product_info = f"CPN: {cpn}\nName: {product.name}"
     if product.supplier_name:
         product_info += f"\nSupplier: {product.supplier_name}"
     if product.supplier_asi:
         product_info += f" (ASI: {product.supplier_asi})"
-    product_info += f"\nUpload URL: {upload_url}"
     
     # Phase 2 varies based on whether this is the first product
     if is_first_product:
@@ -132,7 +130,17 @@ def build_single_product_prompt(
    - Login with email: {ESP_PLUS_EMAIL} and password: {ESP_PLUS_PASSWORD}
 4. Ensure you're on the ESP Plus search page before continuing"""
     
-    prompt = f"""You are a product data extraction agent. Your goal is to find ONE specific product in ESP Plus, print/save the product page as PDF, and upload it to cloud storage.
+    prompt = f"""You are a product data extraction agent. Your goal is to go to the ESP Plus WEBSITE, search for ONE specific product, and PRINT/SAVE the product page as a NEW PDF.
+
+=============================================================================
+⚠️ CRITICAL: DO NOT USE EXISTING FILES
+=============================================================================
+
+- You MUST navigate to {ESP_PLUS_URL} and download a NEW PDF from the website
+- DO NOT rename or reuse any existing PDF files (like presentation.pdf)
+- The distributor report comes from ESP Plus website, NOT from previously downloaded files
+- Any existing files in the working directory are for OTHER purposes - IGNORE THEM
+- Your job is to GET a NEW PDF from the ESP+ website by printing the product page
 
 IMPORTANT CONTEXT:
 - You are controlling a Linux desktop environment
@@ -142,7 +150,7 @@ IMPORTANT CONTEXT:
 - Working directory: {working_dir}
 - Processing product {product_index} of {total_products}
 
-ESP PLUS CREDENTIALS:
+ESP PLUS CREDENTIALS (YOU MUST USE THESE):
 - URL: {ESP_PLUS_URL}
 - Email: {ESP_PLUS_EMAIL}
 - Password: {ESP_PLUS_PASSWORD}
@@ -166,43 +174,44 @@ PHASE 1: VERIFY WORKING DIRECTORY
 
 {login_phase}
 
-PHASE 3: FIND AND DOWNLOAD PRODUCT
-1. SEARCH for the product:
+PHASE 3: SEARCH ON ESP+ WEBSITE AND PRINT NEW PDF
+⚠️ You MUST be on {ESP_PLUS_URL} website at this point, NOT looking at existing files!
+
+1. SEARCH for the product ON THE ESP+ WEBSITE:
+   - Make sure you are in Firefox on the ESP Plus website ({ESP_PLUS_URL})
+   - Find the search box on the ESP Plus website
    - Clear any existing search text
    - Enter the CPN: {cpn}
    - The CPN format is like "CPN-564949909" - you can search with or without the "CPN-" prefix
    - If CPN search fails, try the product name: "{product.name}"
+   - Press Enter or click Search
 
-2. NAVIGATE to the product detail page:
-   - Click on the matching product in search results
+2. NAVIGATE to the product detail page ON ESP+:
+   - Click on the matching product in the ESP+ search results
    - Verify you're on the correct product by checking CPN/name
+   - You should see product details, pricing, and distributor cost information
 
-3. PRINT/SAVE THE PRODUCT PAGE AS PDF:
-   - Click the Print button (printer icon) on the product page
-   - In the print dialog, ensure "Save to PDF" is selected as the destination
-   - Click "Save" to download the PDF
-   - The PDF will contain the product details including pricing
-   - Wait for the download to complete
+3. PRINT THE ESP+ WEBPAGE AS A NEW PDF:
+   ⚠️ You are creating a NEW PDF by printing THIS webpage, not using an existing file!
+   - Press Ctrl+P or use File > Print to open the print dialog
+   - In the print dialog, change the destination to "Save as PDF" or "Print to PDF"
+   - Click "Save" or "Print" button
+   - A file dialog will appear - save to ~/Downloads/
+   - Wait for the download to complete (new PDF file is created)
    - Take a screenshot to confirm download completed
 
-4. IDENTIFY AND MOVE THE FILE:
+4. MOVE THE NEWLY DOWNLOADED PDF:
    - Go to Terminal
-   - Find the most recently downloaded PDF:
-     ls -lt ~/Downloads/*.pdf | head -n 2
-   - Move and rename it to the working directory:
+   - List recent PDFs to find your NEW download (should be the newest file):
+     ls -lt ~/Downloads/*.pdf | head -n 3
+   - Move and rename the NEW PDF to the working directory:
      mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/{cpn}_distributor_report.pdf
    - Verify the file exists:
      ls -la {working_dir}/{cpn}_distributor_report.pdf
 
-5. UPLOAD TO S3:
-   - Run this Python upload command:
-     python3 -c "import urllib.request; data=open('{working_dir}/{cpn}_distributor_report.pdf','rb').read(); req=urllib.request.Request('{upload_url}',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
-   - Verify the upload succeeded (HTTP 200 response printed)
-   - If the upload fails, retry once
-
 PHASE 4: COMPLETION
-1. Take a final screenshot showing the uploaded file
-2. Report success by confirming the file was uploaded (Status: 200)
+1. Take a final screenshot showing the saved file
+2. Confirm the file exists at: {working_dir}/{cpn}_distributor_report.pdf
 3. Your task for this product is complete
 
 =============================================================================
@@ -218,8 +227,8 @@ Find newest PDF in Downloads:
 Move file to working directory:
   mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/{cpn}_distributor_report.pdf
 
-Upload to S3:
-  python3 -c "import urllib.request; data=open('{working_dir}/{cpn}_distributor_report.pdf','rb').read(); req=urllib.request.Request('{upload_url}',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
+Verify file exists:
+  ls -la {working_dir}/{cpn}_distributor_report.pdf
 
 =============================================================================
 SEARCH TIPS
@@ -237,8 +246,20 @@ BEGIN WORKFLOW
 =============================================================================
 
 Start by taking a screenshot to see the current state of the desktop.
-Your goal is to download and upload the Distributor Report for this ONE product: {cpn}
-Be methodical: Search -> Download -> Move/Rename -> Upload -> Confirm.
+
+⚠️ REMEMBER: You MUST go to {ESP_PLUS_URL} website and download a NEW PDF!
+- Do NOT use existing files in the working directory (like presentation.pdf)
+- The distributor report must come from the ESP+ website
+- You will PRINT the ESP+ product page as a NEW PDF
+
+Your goal is to:
+1. Go to {ESP_PLUS_URL}
+2. Log in (if needed)
+3. Search for CPN: {cpn}
+4. Print the product page as PDF
+5. Move the NEW PDF to: {working_dir}/{cpn}_distributor_report.pdf
+
+Be methodical: Navigate to ESP+ -> Search -> Print Page as PDF -> Move/Rename -> Confirm.
 """
     
     return prompt
@@ -246,32 +267,27 @@ Be methodical: Search -> Download -> Move/Rename -> Upload -> Confirm.
 
 def build_lookup_prompt(
     products: List[ProductToLookup],
-    job_id: str,
-    upload_url_map: Dict[str, str]
+    job_id: str
 ) -> str:
     """
     Build the CUA prompt for looking up products in ESP+.
-    
+
     DEPRECATED: Use build_single_product_prompt for sequential processing.
     This function is kept for backwards compatibility.
-    
+
     Args:
         products: List of products to look up
         job_id: Unique job identifier for organizing files
-        upload_url_map: Dictionary mapping CPN to pre-signed S3 upload URL
-    
+
     Returns:
         Formatted prompt string for the CUA
     """
     # If single product, use the new single-product prompt
     if len(products) == 1:
         product = products[0]
-        cpn = product.cpn or 'N/A'
-        upload_url = upload_url_map.get(cpn, '')
         return build_single_product_prompt(
             product=product,
             job_id=job_id,
-            upload_url=upload_url,
             product_index=1,
             total_products=1,
             is_first_product=True
@@ -279,8 +295,8 @@ def build_lookup_prompt(
     
     # For multiple products, use legacy batch prompt (not recommended)
     working_dir = f"~/Downloads/{job_id}"
-    
-    # Build product list for the prompt with their upload URLs
+
+    # Build product list for the prompt
     product_list = []
     for i, product in enumerate(products, 1):
         cpn = product.cpn or 'N/A'
@@ -289,18 +305,15 @@ def build_lookup_prompt(
             entry += f"\n   Supplier: {product.supplier_name}"
         if product.supplier_asi:
             entry += f" (ASI: {product.supplier_asi})"
-        # Include the upload URL for this product
-        if cpn in upload_url_map:
-            entry += f"\n   Upload URL: {upload_url_map[cpn]}"
         product_list.append(entry)
-    
+
     products_text = "\n".join(product_list)
-    
-    prompt = f"""You are a product data extraction agent. Your goal is to log into ESP Plus, find each product listed below, download their Distributor Report PDFs, and upload them to cloud storage.
+
+    prompt = f"""You are a product data extraction agent. Your goal is to log into ESP Plus, find each product listed below, and download their Distributor Report PDFs to a local directory.
 
 IMPORTANT CONTEXT:
 - You are controlling a Linux desktop environment
-- Firefox browser is available
+- Google Chrome browser is available
 - You have Terminal access for file operations
 - Job ID: {job_id}
 - Working directory: {working_dir}
@@ -328,7 +341,7 @@ PHASE 1: SETUP WORKING DIRECTORY
    ls -la ~/Downloads/
 
 PHASE 2: LOGIN TO ESP PLUS
-1. Open Firefox browser
+1. Open Google Chrome browser
 2. Navigate to: {ESP_PLUS_URL}
 3. Login using the credentials provided above:
    - Enter email: {ESP_PLUS_EMAIL}
@@ -352,7 +365,7 @@ For EACH product in the list above:
 3. DOWNLOAD THE DISTRIBUTOR REPORT:
    - Look for a "Print" button or menu
    - Select "Distributor Report" or similar option
-   - Wait for the download to complete (Firefox shows download popup)
+   - Wait for the download to complete (Chrome shows download bar)
    - Take a screenshot to confirm download completed
 
 4. IDENTIFY AND MOVE THE FILE:
@@ -365,36 +378,20 @@ For EACH product in the list above:
    - Verify the file exists:
      ls -la {working_dir}/
 
-5. UPLOAD TO S3:
-   - Use the Upload URL provided for this CPN in the product list above
-   - Run the Python upload command (since curl may not be installed):
-     python3 -c "import urllib.request; data=open('{working_dir}/[CPN]_distributor_report.pdf','rb').read(); req=urllib.request.Request('[Upload URL]',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
-   - Verify the upload succeeded (HTTP 200 response printed)
-   - If the upload fails, retry once
-
-6. REPORT THE DOWNLOAD:
-   - Call the `report_downloaded_pdf` tool with:
-     - sku: The product CPN (e.g., "CPN-564949909")
-     - remote_path: "s3://{job_id}/products/[CPN]_distributor_report.pdf"
-     - product_name: The product name
-
-7. HANDLE ERRORS:
+5. HANDLE ERRORS:
    - If a product cannot be found, call `log_error` with:
      - sku: The product CPN (or "unknown")
      - message: Description of what went wrong
    - Continue to the next product
 
-8. MOVE TO NEXT PRODUCT:
-   - Return to ESP Plus search (in Firefox)
-   - Repeat steps 1-7 for the next item
+6. MOVE TO NEXT PRODUCT:
+   - Return to ESP Plus search (in Chrome)
+   - Repeat steps 1-5 for the next item
 
 PHASE 4: COMPLETION
 After processing ALL products:
-1. Call `report_completion` with:
-   - total_processed: Total number of products attempted
-   - successful: Number of PDFs successfully downloaded and uploaded
-   - failed: Number of products that failed
-   - summary: Brief description of the session
+1. Verify all files exist in the working directory:
+   ls -la {working_dir}/
 2. Take a final screenshot showing completion
 
 =============================================================================
@@ -410,8 +407,8 @@ Find newest PDF in Downloads:
 Move file to working directory (replace [CPN] with actual CPN):
   mv "$(ls -t ~/Downloads/*.pdf | head -1)" {working_dir}/[CPN]_distributor_report.pdf
 
-Upload to S3 (using Python - replace [CPN] and [Upload URL]):
-  python3 -c "import urllib.request; data=open('{working_dir}/[CPN]_distributor_report.pdf','rb').read(); req=urllib.request.Request('[Upload URL]',data=data,method='PUT'); req.add_header('Content-Type','application/pdf'); print('Status:',urllib.request.urlopen(req).status)"
+Verify files exist:
+  ls -la {working_dir}/
 
 =============================================================================
 SEARCH TIPS
@@ -450,28 +447,15 @@ DISTRIBUTOR REPORT DOWNLOAD TIPS
    - Download typically goes to ~/Downloads by default
 
 =============================================================================
-AVAILABLE TOOLS
-=============================================================================
-
-1. `report_downloaded_pdf` - Report a successfully downloaded PDF
-   Required: sku, remote_path, product_name
-
-2. `log_error` - Log an error for a product
-   Required: sku, message
-
-3. `report_completion` - Report that all products have been processed
-   Required: total_processed, successful, failed
-
-=============================================================================
 BEGIN WORKFLOW
 =============================================================================
 
 Start by taking a screenshot to see the current state of the desktop, then proceed with Phase 1 (Setup Working Directory).
 Be methodical and thorough. Process items one at a time.
-For each product: Download -> Move/Rename -> Upload -> Report -> Next.
+For each product: Download -> Move/Rename -> Confirm -> Next.
 If you encounter errors, log them and continue with the next product.
 """
-    
+
     return prompt
 
 
@@ -482,20 +466,20 @@ If you encounter errors, log them and continue with the next product.
 class ESPProductLookup:
     """
     CUA Agent for looking up products in ESP+ and downloading sell sheets.
-    
+
     This agent logs into ESP+, searches for each product in the provided list,
-    downloads the Distributor Report PDF for each, and uploads them to S3.
-    
+    and downloads the Distributor Report PDF for each to the Orgo VM.
+    File export is handled separately via Orgo API after the CUA completes.
+
     For best results, use sequential single-product runs via run_single_product()
     instead of batch runs. This improves reliability by isolating each product's
     processing in its own CUA session.
     """
-    
+
     def __init__(
         self,
         products: List[Dict[str, Any]],
         job_id: str,
-        upload_url_map: Dict[str, str],
         computer_id: Optional[str] = None,
         dry_run: bool = False,
         product_index: int = 1,
@@ -509,7 +493,6 @@ class ESPProductLookup:
         Args:
             products: List of products to look up (each should have 'cpn' or 'sku' and 'name')
             job_id: Unique job identifier for organizing files
-            upload_url_map: Dictionary mapping CPN to pre-signed S3 upload URL
             computer_id: Optional Orgo computer ID (defaults to ORGO_COMPUTER_ID)
             dry_run: If True, don't execute the CUA
             product_index: Current product index (1-based) for progress tracking
@@ -519,7 +502,6 @@ class ESPProductLookup:
         """
         self.products = self._normalize_products(products)
         self.job_id = job_id
-        self.upload_url_map = upload_url_map
         self.computer_id = computer_id or ORGO_COMPUTER_ID
         self.dry_run = dry_run
         self.product_index = product_index
@@ -583,7 +565,6 @@ class ESPProductLookup:
                 current_item_name=product_name
             )
 
-        logger.info(f"Upload URLs configured: {len(self.upload_url_map)}")
         logger.info(f"Dry run: {self.dry_run}")
         logger.info(f"First product (full login): {self.is_first_product}")
 
@@ -627,12 +608,9 @@ class ESPProductLookup:
             # Build the prompt - use single product prompt for sequential processing
             if is_single_product:
                 product = self.products[0]
-                cpn = product.cpn or 'N/A'
-                upload_url = self.upload_url_map.get(cpn, '')
                 prompt = build_single_product_prompt(
                     product=product,
                     job_id=self.job_id,
-                    upload_url=upload_url,
                     product_index=self.product_index,
                     total_products=self.total_products,
                     is_first_product=self.is_first_product
@@ -641,8 +619,7 @@ class ESPProductLookup:
                 # Legacy batch prompt
                 prompt = build_lookup_prompt(
                     products=self.products,
-                    job_id=self.job_id,
-                    upload_url_map=self.upload_url_map
+                    job_id=self.job_id
                 )
             
             # Get current product CPN for metadata
@@ -720,18 +697,18 @@ class ESPProductLookup:
                     metadata={
                         "cpn": product.cpn,
                         "product_index": self.product_index,
-                        "total_products": self.total_products
+                        "total_products": self.total_products,
+                        "vm_path": f"~/Downloads/{self.job_id}/{product.cpn}_distributor_report.pdf"
                     }
                 )
 
-            # The agent should have uploaded files to S3 via curl
-            # We assume success based on prompt completion
-            # The orchestrator will verify files exist in S3
+            # The agent saves files to the VM's local storage
+            # The orchestrator will export them via Orgo API after CUA completes
             # Generate expected paths based on products processed
             expected_pdfs = [
                 {
                     "sku": p.cpn,
-                    "remote_path": f"s3://{self.job_id}/products/{p.cpn}_distributor_report.pdf",
+                    "remote_path": f"Downloads/{self.job_id}/{p.cpn}_distributor_report.pdf",
                     "product_name": p.name
                 }
                 for p in self.products
@@ -739,7 +716,7 @@ class ESPProductLookup:
 
             return LookupResult(
                 total_products=len(self.products),
-                successful=len(self.products),  # Optimistic - orchestrator verifies
+                successful=len(self.products),  # Optimistic - orchestrator verifies via export
                 failed=0,
                 downloaded_pdfs=expected_pdfs,
                 errors=[]
@@ -773,7 +750,7 @@ def main():
     import argparse
     import json
     from datetime import datetime
-    
+
     parser = argparse.ArgumentParser(
         description="Look up products in ESP+ and download sell sheets"
     )
@@ -802,15 +779,15 @@ def main():
         action="store_true",
         help="Enable verbose logging"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Set up logging
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
+
     # Load products
     try:
         # Try as file path first
@@ -823,60 +800,48 @@ def main():
     except json.JSONDecodeError as e:
         print(f"Error parsing products JSON: {e}", file=sys.stderr)
         sys.exit(1)
-    
+
     # Ensure products is a list
     if isinstance(products, dict) and "products" in products:
         products = products["products"]
-    
+
     if not isinstance(products, list):
         print("Products must be a list", file=sys.stderr)
         sys.exit(1)
-    
+
     # Generate job ID if not provided
     job_id = args.job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
-    # Initialize S3 handler and generate upload URLs for each product
-    from s3_handler import S3Handler
-    s3_handler = S3Handler(job_id=job_id)
-    
-    # Extract CPNs from products and generate upload URLs
-    cpns = []
-    for p in products:
-        cpn = p.get("cpn") or p.get("sku") or p.get("item_number") or ""
-        if cpn:
-            cpns.append(cpn)
-    
-    upload_url_map = s3_handler.generate_product_upload_urls(cpns)
-    
-    print(f"Generated {len(upload_url_map)} upload URLs for job: {job_id}")
-    
+
+    print(f"Starting product lookup for job: {job_id}")
+    print(f"Products to process: {len(products)}")
+
     # Run lookup
     lookup = ESPProductLookup(
         products=products,
         job_id=job_id,
-        upload_url_map=upload_url_map,
         computer_id=args.computer_id,
         dry_run=args.dry_run
     )
-    
+
     result = lookup.run()
-    
+
     # Output results
     print(f"\nResults:")
     print(f"  Total: {result.total_products}")
     print(f"  Successful: {result.successful}")
     print(f"  Failed: {result.failed}")
-    
+
     if result.downloaded_pdfs:
-        print(f"\nUploaded PDFs:")
+        print(f"\nPDFs saved to VM:")
         for pdf in result.downloaded_pdfs:
             print(f"  - {pdf['sku']}: {pdf['remote_path']}")
-    
+        print(f"\nUse Orgo File Export API to retrieve the files")
+
     if result.errors:
         print(f"\nErrors:")
         for error in result.errors:
             print(f"  - {error['sku']}: {error['message']}")
-    
+
     sys.exit(0 if result.successful > 0 else 1)
 
 
