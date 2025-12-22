@@ -209,20 +209,35 @@ def trigger_workflow(platform: str, url: str, client_email: str = None) -> bool:
     if client_email:
         logger.info(f"  Client email: {client_email}")
 
-    # Build command - use python3 from venv if available
-    venv_python = os.path.join(PROJECT_PATH, "venv", "bin", "python3")
-    python_cmd = venv_python if os.path.exists(venv_python) else "python3"
+    # Build command - use promo-parser CLI from venv
+    promo_parser_cmd = os.path.join(PROJECT_PATH, "venv", "bin", "promo-parser")
+
+    # Fallback to python + orchestrator for development if CLI not available
+    if not os.path.exists(promo_parser_cmd):
+        venv_python = os.path.join(PROJECT_PATH, "venv", "bin", "python3")
+        python_cmd = venv_python if os.path.exists(venv_python) else "python3"
+        promo_parser_cmd = None
 
     # Full workflow: all features enabled, verbose output, NO product limit
     # Note: URL is a positional argument, not a flag
-    cmd = [
-        python_cmd, 'orchestrator.py',
-        url,  # positional argument
-        '--zoho-upload',
-        '--zoho-quote',
-        '--calculator',
-        '--verbose'
-    ]
+    if promo_parser_cmd:
+        cmd = [
+            promo_parser_cmd,
+            url,  # positional argument
+            '--zoho-upload',
+            '--zoho-quote',
+            '--calculator',
+            '--verbose'
+        ]
+    else:
+        cmd = [
+            python_cmd, '-m', 'promo_parser.pipelines.orchestrator',
+            url,
+            '--zoho-upload',
+            '--zoho-quote',
+            '--calculator',
+            '--verbose'
+        ]
 
     # Add client email for Zoho contact lookup if available
     if client_email:
@@ -483,7 +498,7 @@ def main():
     logger.info(f"  Processed File: {PROCESSED_FILE}")
     logger.info("=" * 60)
     logger.info("")
-    logger.info("Workflow command: orchestrator.py --zoho-upload --zoho-quote --calculator --verbose")
+    logger.info("Workflow command: promo-parser <url> --zoho-upload --zoho-quote --calculator --verbose")
     logger.info("  (No product limit - processes ALL products)")
     logger.info("")
     logger.info("URL patterns being watched:")
