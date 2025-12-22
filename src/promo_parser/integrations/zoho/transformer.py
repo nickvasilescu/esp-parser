@@ -1699,7 +1699,7 @@ def build_estimate_payload(
         Complete estimate payload for Zoho API
     """
     from datetime import datetime, timedelta
-    from zoho_config import ZOHO_QUOTE_DEFAULTS
+    from promo_parser.integrations.zoho.config import ZOHO_QUOTE_DEFAULTS
 
     products = unified_output.get("products", [])
     metadata = unified_output.get("metadata", {})

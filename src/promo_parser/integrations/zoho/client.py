@@ -1130,7 +1130,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     
     try:
-        from zoho_config import validate_zoho_config
+        from promo_parser.integrations.zoho.config import validate_zoho_config
         validate_zoho_config()
         
         client = create_zoho_client()
