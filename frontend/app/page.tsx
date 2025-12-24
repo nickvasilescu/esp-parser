@@ -114,15 +114,15 @@ export default function Home() {
       </div>
 
       {/* Main Content: VM Panel + Active Workflows side by side */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4 xl:grid-rows-[1fr]">
         {/* VM Panel - Left/Top */}
-        <VMPanel />
+        <VMPanel className="h-full" />
 
         {/* Active Workflows Table - Right/Bottom */}
         <JobsTable
           jobs={allJobs}
           onSelectJob={setSelectedJob}
-          className="max-h-[400px]"
+          className="h-full"
           isLoading={isLoading}
         />
       </div>
