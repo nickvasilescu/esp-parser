@@ -404,7 +404,8 @@ def watch_inbox() -> None:
                     break
 
                 # Wait for EXISTS notification (new mail) or timeout
-                mail.sock.settimeout(300)  # 5 minute timeout
+                # Using 2-minute timeout for more frequent polling fallback
+                mail.sock.settimeout(120)  # 2 minute timeout
 
                 try:
                     while True:
@@ -427,16 +428,23 @@ def watch_inbox() -> None:
                             raise ConnectionResetError("Server closed connection")
 
                 except TimeoutError:
-                    # Timeout - exit IDLE and restart it
-                    logger.debug("IDLE timeout, refreshing connection...")
+                    # Timeout - exit IDLE and poll for emails
+                    # This is critical because IDLE notifications can silently fail
+                    logger.info("Polling for new emails (IDLE fallback)...")
                     mail.send(b'DONE\r\n')
                     try:
                         mail.readline()  # Read OK response
                     except Exception:
                         pass
 
-                    # Do a quick NOOP to keep connection alive
-                    mail.noop()
+                    # Poll for unread emails - this is our reliability fallback
+                    # IDLE notifications can silently stop working with Gmail
+                    try:
+                        process_new_emails(mail, processed_ids)
+                    except Exception as e:
+                        logger.warning(f"Polling failed: {e}, reconnecting...")
+                        break
+
                     idle_timeout += 1
 
                     if idle_timeout >= 6:  # ~30 minutes
