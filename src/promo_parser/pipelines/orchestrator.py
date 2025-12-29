@@ -14,10 +14,12 @@ Usage:
 """
 
 import argparse
+import asyncio
 import json
 import logging
 import os
 import sys
+import time
 from dataclasses import asdict
 from datetime import datetime
 from enum import Enum
@@ -26,6 +28,13 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from anthropic import Anthropic
+
+# =============================================================================
+# Orchestrator-Level Retry Configuration
+# =============================================================================
+# For recovering from brief API outages that exceed SDK-level retries
+MAX_ZOHO_AGENT_RETRIES = 2
+ZOHO_AGENT_RETRY_DELAY = 30  # Wait 30 seconds before retry (SDK uses ~0.5s)
 
 from promo_parser.core.config import (
     validate_config,
@@ -1098,16 +1107,52 @@ class Orchestrator:
                     # Emit state: searching customer
                     self.state_manager.update(WorkflowStatus.ZOHO_SEARCHING_CUSTOMER.value)
 
-                    # Create and run agent (agent will emit more granular states internally)
+                    # Create and run agent with orchestrator-level retry for transient API failures
+                    # The SDK has built-in retries (~0.5s delays), but brief outages need longer waits
                     zoho_agent = ZohoItemMasterAgent(
                         state_manager=self.state_manager,
                         client_email=self.client_email
                     )
-                    zoho_result = zoho_agent.process_unified_output(
-                        normalized_result,
-                        dry_run=self.zoho_dry_run
-                    )
-                    
+
+                    for attempt in range(MAX_ZOHO_AGENT_RETRIES + 1):
+                        try:
+                            zoho_result = zoho_agent.process_unified_output(
+                                normalized_result,
+                                dry_run=self.zoho_dry_run
+                            )
+                            break  # Success - exit retry loop
+
+                        except Exception as retry_e:
+                            error_msg = str(retry_e)
+                            # Check if this is a retryable transient error (API outage indicators)
+                            is_retryable = any(phrase in error_msg.lower() for phrase in [
+                                "520", "502", "503", "504",  # Server errors (Cloudflare/nginx)
+                                "timeout", "connection", "overloaded",
+                                "server error", "service unavailable"
+                            ])
+
+                            if is_retryable and attempt < MAX_ZOHO_AGENT_RETRIES:
+                                logger.warning(f"Item Master agent failed (attempt {attempt + 1}/{MAX_ZOHO_AGENT_RETRIES + 1}): {error_msg[:200]}")
+                                logger.info(f"Waiting {ZOHO_AGENT_RETRY_DELAY}s before retry...")
+
+                                # Emit retry event for dashboard visibility
+                                self.state_manager.emit_thought(
+                                    agent="orchestrator",
+                                    event_type="retry",
+                                    content=f"Retrying Item Master after API error",
+                                    metadata={
+                                        "attempt": attempt + 1,
+                                        "delay": ZOHO_AGENT_RETRY_DELAY,
+                                        "error_type": "transient"
+                                    }
+                                )
+
+                                time.sleep(ZOHO_AGENT_RETRY_DELAY)
+                                continue
+                            else:
+                                # Non-retryable error or max retries exceeded - re-raise
+                                raise
+
                     # Add Zoho result to normalized output
                     normalized_result["zoho_upload_result"] = {
                         "success": zoho_result.success,

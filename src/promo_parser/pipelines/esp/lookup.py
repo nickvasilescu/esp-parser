@@ -17,11 +17,18 @@ Usage:
 import logging
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from orgo import Computer
+
+# =============================================================================
+# CUA Retry Configuration
+# =============================================================================
+MAX_CUA_RETRIES = 3
+RETRY_DELAY_SECONDS = 2  # Initial delay, doubles each retry (exponential backoff)
 
 from promo_parser.core.config import (
     ORGO_COMPUTER_ID,
@@ -670,21 +677,76 @@ class ESPProductLookup:
                             metadata={"cpn": current_cpn} if current_cpn else None
                         )
             
-            # Execute the agent workflow
+            # Execute the agent workflow with retry logic for transient errors
             logger.info(f"Starting CUA with model: {MODEL_ID}")
-            
-            messages = self.computer.prompt(
-                prompt,
-                callback=progress_callback,
-                model=MODEL_ID,
-                display_width=DISPLAY_WIDTH,
-                display_height=DISPLAY_HEIGHT,
-                thinking_enabled=True,
-                thinking_budget=THINKING_BUDGET,
-                max_iterations=MAX_ITERATIONS,
-                max_tokens=MAX_TOKENS
-            )
-            
+
+            retries = 0
+            last_error = None
+            messages = None
+
+            while retries < MAX_CUA_RETRIES:
+                try:
+                    messages = self.computer.prompt(
+                        prompt,
+                        callback=progress_callback,
+                        model=MODEL_ID,
+                        display_width=DISPLAY_WIDTH,
+                        display_height=DISPLAY_HEIGHT,
+                        thinking_enabled=True,
+                        thinking_budget=THINKING_BUDGET,
+                        max_iterations=MAX_ITERATIONS,
+                        max_tokens=MAX_TOKENS
+                    )
+                    break  # Success - exit retry loop
+
+                except Exception as e:
+                    error_msg = str(e)
+                    # Check if this is a retryable transient error
+                    is_retryable = any(phrase in error_msg.lower() for phrase in [
+                        "could not process image",
+                        "timeout",
+                        "connection",
+                        "rate limit",
+                        "overloaded",
+                        "520",
+                        "502",
+                        "503",
+                        "504"
+                    ])
+
+                    if is_retryable and retries < MAX_CUA_RETRIES - 1:
+                        retries += 1
+                        delay = RETRY_DELAY_SECONDS * (2 ** (retries - 1))  # Exponential backoff: 2s, 4s
+                        logger.warning(f"Retryable CUA error (attempt {retries}/{MAX_CUA_RETRIES}): {error_msg[:200]}")
+                        logger.info(f"Waiting {delay}s before retry...")
+
+                        # Emit retry event to state manager for dashboard visibility
+                        if self.state_manager:
+                            self.state_manager.emit_thought(
+                                agent="cua_product",
+                                event_type="retry",
+                                content=f"Retrying after error: {error_msg[:100]}",
+                                metadata={
+                                    "attempt": retries,
+                                    "delay": delay,
+                                    "cpn": current_cpn,
+                                    "error_type": "transient"
+                                }
+                            )
+
+                        time.sleep(delay)
+                        continue
+                    else:
+                        # Non-retryable error or max retries exceeded
+                        last_error = e
+                        raise
+
+            # Safety check - should never reach here without messages or error
+            if messages is None and last_error:
+                raise last_error
+            elif messages is None:
+                raise Exception(f"CUA failed after {MAX_CUA_RETRIES} retries")
+
             logger.info("CUA workflow completed")
 
             # Emit success thought
