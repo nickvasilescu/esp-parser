@@ -22,6 +22,14 @@ from promo_parser.integrations.zoho.config import (
     ZOHO_REFRESH_TOKEN,
     ZOHO_API_BASE_URL,
     ZOHO_TOKEN_URL,
+    # Mail API config
+    ZOHO_MAIL_ACCOUNT_ID,
+    ZOHO_MAIL_CLIENT_ID,
+    ZOHO_MAIL_CLIENT_SECRET,
+    ZOHO_MAIL_REFRESH_TOKEN,
+    ZOHO_MAIL_FROM_ADDRESS,
+    ZOHO_MAIL_CC_ALWAYS,
+    ZOHO_MAIL_API_BASE_URL,
 )
 
 logger = logging.getLogger(__name__)
@@ -1112,6 +1120,206 @@ class ZohoClient:
             )
 
         return self.upload_file_to_workdrive(folder_id, file_path)
+
+    # =========================================================================
+    # Zoho Mail API
+    # =========================================================================
+
+    def _get_mail_access_token(self) -> str:
+        """
+        Get a valid access token for Zoho Mail API.
+
+        Uses separate OAuth credentials with ZohoMail scopes.
+        Caches the token in _mail_access_token.
+
+        Returns:
+            Valid access token for Mail API
+
+        Raises:
+            ZohoAPIError: If token refresh fails or credentials not configured
+        """
+        # Check if we have cached mail token
+        if hasattr(self, '_mail_access_token') and hasattr(self, '_mail_token_expiry'):
+            if self._mail_access_token and time.time() < self._mail_token_expiry:
+                return self._mail_access_token
+
+        # Validate mail credentials
+        if not all([ZOHO_MAIL_CLIENT_ID, ZOHO_MAIL_CLIENT_SECRET, ZOHO_MAIL_REFRESH_TOKEN]):
+            raise ZohoAPIError(
+                "Zoho Mail API credentials not configured. "
+                "Set ZOHO_MAIL_CLIENT_ID, ZOHO_MAIL_CLIENT_SECRET, and ZOHO_MAIL_REFRESH_TOKEN."
+            )
+
+        logger.debug("Refreshing Zoho Mail access token...")
+
+        data = {
+            "refresh_token": ZOHO_MAIL_REFRESH_TOKEN,
+            "client_id": ZOHO_MAIL_CLIENT_ID,
+            "client_secret": ZOHO_MAIL_CLIENT_SECRET,
+            "grant_type": "refresh_token"
+        }
+
+        try:
+            response = requests.post(ZOHO_TOKEN_URL, data=data)
+            response.raise_for_status()
+
+            token_data = response.json()
+
+            if "access_token" not in token_data:
+                raise ZohoAPIError(
+                    f"Mail token refresh failed: {token_data.get('error', 'Unknown error')}",
+                    response=token_data
+                )
+
+            self._mail_access_token = token_data["access_token"]
+            expires_in = token_data.get("expires_in", 3600)
+            self._mail_token_expiry = time.time() + expires_in - 300
+
+            logger.debug("Mail access token refreshed successfully")
+            return self._mail_access_token
+
+        except requests.RequestException as e:
+            raise ZohoAPIError(f"Mail token refresh request failed: {e}")
+
+    def upload_mail_attachment(self, file_path: str) -> Dict[str, str]:
+        """
+        Upload a file as a mail attachment to Zoho Mail.
+
+        This is step 1 of the two-step mail send process.
+        The returned attachment info is used in send_email_with_attachment().
+
+        Args:
+            file_path: Local path to the file to upload
+
+        Returns:
+            Dict with storeName, attachmentPath, attachmentName
+
+        Raises:
+            ZohoAPIError: If upload fails
+            FileNotFoundError: If file doesn't exist
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        if not ZOHO_MAIL_ACCOUNT_ID:
+            raise ZohoAPIError("ZOHO_MAIL_ACCOUNT_ID not configured")
+
+        token = self._get_mail_access_token()
+        url = f"{ZOHO_MAIL_API_BASE_URL}/accounts/{ZOHO_MAIL_ACCOUNT_ID}/messages/attachments"
+
+        headers = {
+            "Authorization": f"Zoho-oauthtoken {token}",
+            "Accept": "application/json"
+        }
+
+        # Required query parameter for multipart upload
+        params = {"uploadType": "multipart"}
+
+        filename = os.path.basename(file_path)
+        logger.info(f"Uploading mail attachment: {filename}")
+
+        try:
+            with open(file_path, "rb") as f:
+                files = {
+                    "attach": (filename, f, "application/octet-stream")
+                }
+                response = requests.post(url, headers=headers, files=files, params=params)
+                response.raise_for_status()
+
+            result = response.json()
+            data = result.get("data", {})
+
+            # Handle both list and dict response formats
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]  # Take first attachment from list
+
+            attachment_info = {
+                "storeName": data.get("storeName"),
+                "attachmentPath": data.get("attachmentPath"),
+                "attachmentName": data.get("attachmentName", filename)
+            }
+
+            logger.info(f"Attachment uploaded: storeName={attachment_info['storeName']}")
+            return attachment_info
+
+        except requests.RequestException as e:
+            raise ZohoAPIError(f"Failed to upload mail attachment: {e}")
+
+    def send_email_with_attachment(
+        self,
+        to_addresses: List[str],
+        subject: str,
+        body_html: str,
+        attachment_info: Optional[Dict[str, str]] = None,
+        cc_addresses: Optional[List[str]] = None,
+        from_address: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Send an email with optional attachment via Zoho Mail API.
+
+        This is step 2 of the two-step mail send process.
+        Use upload_mail_attachment() first to get attachment_info.
+
+        Args:
+            to_addresses: List of recipient email addresses
+            subject: Email subject
+            body_html: HTML body content
+            attachment_info: Dict from upload_mail_attachment() with storeName, attachmentPath, attachmentName
+            cc_addresses: Optional list of CC addresses (ZOHO_MAIL_CC_ALWAYS is always added)
+            from_address: Sender address (defaults to ZOHO_MAIL_FROM_ADDRESS)
+
+        Returns:
+            API response with sent message info
+
+        Raises:
+            ZohoAPIError: If send fails
+        """
+        if not ZOHO_MAIL_ACCOUNT_ID:
+            raise ZohoAPIError("ZOHO_MAIL_ACCOUNT_ID not configured")
+
+        token = self._get_mail_access_token()
+        url = f"{ZOHO_MAIL_API_BASE_URL}/accounts/{ZOHO_MAIL_ACCOUNT_ID}/messages"
+
+        headers = {
+            "Authorization": f"Zoho-oauthtoken {token}",
+            "Content-Type": "application/json"
+        }
+
+        # Build CC list - always include ZOHO_MAIL_CC_ALWAYS
+        cc_list = list(cc_addresses) if cc_addresses else []
+        if ZOHO_MAIL_CC_ALWAYS and ZOHO_MAIL_CC_ALWAYS not in cc_list:
+            cc_list.append(ZOHO_MAIL_CC_ALWAYS)
+
+        payload = {
+            "fromAddress": from_address or ZOHO_MAIL_FROM_ADDRESS,
+            "toAddress": ",".join(to_addresses),
+            "subject": subject,
+            "content": body_html,
+            "mailFormat": "html"
+        }
+
+        if cc_list:
+            payload["ccAddress"] = ",".join(cc_list)
+
+        if attachment_info:
+            payload["attachments"] = [{
+                "storeName": attachment_info["storeName"],
+                "attachmentName": attachment_info["attachmentName"],
+                "attachmentPath": attachment_info["attachmentPath"]
+            }]
+
+        logger.info(f"Sending email to {to_addresses} with subject: {subject[:50]}...")
+
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+
+            result = response.json()
+            logger.info(f"Email sent successfully")
+            return result
+
+        except requests.RequestException as e:
+            raise ZohoAPIError(f"Failed to send email: {e}")
 
 
 # =============================================================================

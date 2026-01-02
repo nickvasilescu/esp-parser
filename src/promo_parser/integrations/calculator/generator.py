@@ -78,6 +78,24 @@ CALCULATOR_AGENT_TOOLS = [
         }
     },
     {
+        "name": "send_calculator_email",
+        "description": "Send the calculator file via email to the original email recipients. Uses reply-all to the triggering email, always CC's koell@stblstrategies.com.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Local path to the Excel file to attach"
+                },
+                "subject_prefix": {
+                    "type": "string",
+                    "description": "Subject prefix (e.g., 'Re: ' for reply)"
+                }
+            },
+            "required": ["file_path"]
+        }
+    },
+    {
         "name": "report_completion",
         "description": "Report that calculator generation and upload is complete.",
         "input_schema": {
@@ -85,7 +103,8 @@ CALCULATOR_AGENT_TOOLS = [
             "properties": {
                 "summary": {"type": "string"},
                 "file_name": {"type": "string"},
-                "permalink": {"type": "string"}
+                "permalink": {"type": "string"},
+                "email_sent": {"type": "boolean"}
             },
             "required": ["summary"]
         }
@@ -102,21 +121,31 @@ CALCULATOR_AGENT_SYSTEM_PROMPT = """You are a Calculator Generator agent.
 ## Your Task
 1. Generate an Excel calculator spreadsheet for the client
 2. Upload it to the "Cost Calculators" folder in Zoho WorkDrive
-3. Report completion with the permalink
+3. Email the calculator to the client (if email context is provided)
+4. Report completion with the permalink
 
 ## Workflow
 
 STEP 1: Call generate_calculator_xlsx
-- File name format: "{ClientName} Promo Calc {YYYYMMDD_HHMMSS}"
-- Example: "Otava Promo Calc 20251213_143022"
-- This ensures each calculator is saved as a new file, not overwriting existing ones
-- Clean the client name (remove special characters)
+- File name priority:
+  1. If presentation_title provided: "{PresentationTitle} Calc {YYYYMMDD}"
+  2. Fallback: "{ClientName} Promo Calc {YYYYMMDD_HHMMSS}"
+- Example with title: "Spring 2026 Promo Lineup Calc 20260101"
+- Example fallback: "Otava Promo Calc 20260101_143022"
+- Clean the name (remove special characters)
 
 STEP 2: Call upload_to_cost_calculators
 - Pass the file_path returned from step 1
 
-STEP 3: Call report_completion
+STEP 3: Call send_calculator_email (IF email context provided)
+- Only call this if the context includes email_context with recipient info
+- Uses reply-all to the original email recipients
+- Always CCs koell@stblstrategies.com automatically
+- Pass the file_path from step 1
+
+STEP 4: Call report_completion
 - Include the permalink so user can access the file
+- Set email_sent to true if email was sent
 
 ## Notes
 - The spreadsheet has editable quantity columns (yellow) for client to adjust
@@ -185,15 +214,18 @@ class CalculatorGeneratorAgent:
         self._result = None
         self._generated_file_path = None
 
-        # Extract client info
+        # Extract client info and presentation title
         client_name = unified_output.get("client", {}).get("company") or \
                       unified_output.get("client", {}).get("name") or "Client"
+        metadata = unified_output.get("metadata", {})
+        presentation_title = metadata.get("presentation_title")
         products = unified_output.get("products", [])
 
         # Build initial message with context
         initial_message = f"""Generate a calculator spreadsheet for:
 
 Client: {client_name}
+Presentation Title: {presentation_title or "(not provided - use client name)"}
 Products: {len(products)} items
 Year: {datetime.now().year}
 
@@ -207,13 +239,25 @@ Product summary:
         if len(products) > 5:
             initial_message += f"  ... and {len(products) - 5} more\n"
 
-        initial_message += "\nPlease generate the calculator and upload to Cost Calculators folder."
+        # Check for email context
+        email_context = unified_output.get("_email_context")
+        if email_context:
+            initial_message += f"\nEmail context (for reply-all):\n"
+            initial_message += f"  From: {email_context.get('from_address', 'unknown')}\n"
+            initial_message += f"  Subject: {email_context.get('subject', 'unknown')}\n"
+            initial_message += "\nPlease generate the calculator, upload to Cost Calculators folder, AND send via email."
+        else:
+            initial_message += "\nPlease generate the calculator and upload to Cost Calculators folder."
 
         # Dry run mode - just generate locally
         if dry_run:
-            # Clean client name for filename
-            clean_name = "".join(c for c in client_name if c.isalnum() or c in " -_").strip()
-            file_name = f"{clean_name} Promo Calc {datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            # Use presentation title if available, otherwise fallback to client name
+            if presentation_title:
+                clean_name = "".join(c for c in presentation_title if c.isalnum() or c in " -_").strip()
+                file_name = f"{clean_name} Calc {datetime.now().strftime('%Y%m%d')}"
+            else:
+                clean_name = "".join(c for c in client_name if c.isalnum() or c in " -_").strip()
+                file_name = f"{clean_name} Promo Calc {datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
             try:
                 file_path = self._generate_xlsx(file_name)
@@ -298,6 +342,8 @@ Product summary:
             return self._tool_generate_xlsx(tool_input)
         elif tool_name == "upload_to_cost_calculators":
             return self._tool_upload(tool_input)
+        elif tool_name == "send_calculator_email":
+            return self._tool_send_email(tool_input)
         elif tool_name == "report_completion":
             return self._tool_report_completion(tool_input)
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
@@ -365,6 +411,105 @@ Product summary:
                 "file_id": file_id,
                 "permalink": permalink
             })
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)})
+
+    def _tool_send_email(self, tool_input: Dict) -> str:
+        """Tool handler: Send calculator email to original recipients."""
+        file_path = tool_input.get("file_path")
+        if not file_path or not os.path.exists(file_path):
+            return json.dumps({"success": False, "error": "File not found"})
+
+        if not self.zoho_client:
+            return json.dumps({"success": False, "error": "Zoho client not configured"})
+
+        # Get email context from unified_output
+        email_context = self._unified_output.get("_email_context")
+        if not email_context:
+            return json.dumps({
+                "success": False,
+                "error": "No email context available - cannot determine recipients"
+            })
+
+        # Emit thought for sending email
+        if self.state_manager:
+            self.state_manager.emit_thought(
+                agent="calculator_agent",
+                event_type="action",
+                content="Sending calculator via email"
+            )
+
+        try:
+            # Build reply-all recipients
+            to_addresses = []
+
+            # Add original sender
+            from_addr = email_context.get("from_address")
+            if from_addr:
+                to_addresses.append(from_addr)
+
+            # Add all original TO recipients (excluding ourselves)
+            for addr in email_context.get("to_addresses", []):
+                if addr not in to_addresses and "stblstrategies.com" not in addr.lower():
+                    to_addresses.append(addr)
+
+            if not to_addresses:
+                return json.dumps({
+                    "success": False,
+                    "error": "No recipients found in email context"
+                })
+
+            # CC addresses from original email (excluding ourselves)
+            cc_addresses = [
+                addr for addr in email_context.get("cc_addresses", [])
+                if "stblstrategies.com" not in addr.lower()
+            ]
+
+            # Build subject
+            original_subject = email_context.get("subject", "Promo Presentation")
+            subject_prefix = tool_input.get("subject_prefix", "Re: ")
+            subject = f"{subject_prefix}{original_subject}" if not original_subject.startswith("Re:") else original_subject
+
+            # Build email body
+            client_name = self._unified_output.get("client", {}).get("company", "")
+            product_count = len(self._unified_output.get("products", []))
+            file_name = os.path.basename(file_path)
+
+            body_html = f"""
+            <html>
+            <body>
+            <p>Please find attached the cost calculator for the {client_name} promotional presentation.</p>
+            <p><strong>Calculator Summary:</strong></p>
+            <ul>
+                <li>Products: {product_count} items</li>
+                <li>File: {file_name}</li>
+            </ul>
+            <p>The yellow cells in the spreadsheet are editable - adjust quantities as needed and
+            totals will update automatically.</p>
+            <p>Best regards,<br>STBL Strategies</p>
+            </body>
+            </html>
+            """
+
+            # Step 1: Upload attachment
+            attachment_info = self.zoho_client.upload_mail_attachment(file_path)
+
+            # Step 2: Send email
+            result = self.zoho_client.send_email_with_attachment(
+                to_addresses=to_addresses,
+                subject=subject,
+                body_html=body_html,
+                attachment_info=attachment_info,
+                cc_addresses=cc_addresses
+            )
+
+            return json.dumps({
+                "success": True,
+                "to": to_addresses,
+                "cc": cc_addresses,
+                "subject": subject
+            })
+
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)})
 

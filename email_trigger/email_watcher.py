@@ -2,14 +2,23 @@
 """
 IMAP IDLE email watcher for triggering automation workflows.
 
-Watches for emails where nick@computeruse.agency is CC'd and
+Watches for emails where alex@stblstrategies.com is CC'd and
 contains ESP or SAGE presentation URLs. Triggers the orchestrator
 workflow automatically when a valid email is received.
 
+NOTE: alex@stblstrategies.com is an alias of cs@stblstrategies.com.
+IMAP login uses the primary account (cs@) while we watch for the alias (alex@).
+
 Usage:
-    export GMAIL_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"
-    export AUTHORIZED_SENDER="client@example.com"
+    export ZOHO_MAIL_APP_PASSWORD="your-app-password"
     python email_watcher.py
+
+Environment Variables:
+    IMAP_SERVER: IMAP server (default: imap.zoho.com)
+    IMAP_USER: Primary email for IMAP login (default: cs@stblstrategies.com)
+    WATCH_EMAIL: Email alias to watch in To/CC (default: alex@stblstrategies.com)
+    ZOHO_MAIL_APP_PASSWORD: Zoho app password for IMAP
+    AUTHORIZED_SENDERS: Comma-separated list of senders that can trigger workflows
 """
 import imaplib
 import email
@@ -25,9 +34,14 @@ from pathlib import Path
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-IMAP_SERVER = "imap.gmail.com"
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS", "nick@computeruse.agency")
-APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+# Zoho Mail IMAP settings
+# NOTE: alex@stblstrategies.com is an ALIAS of cs@stblstrategies.com
+# - IMAP login MUST use the primary account (cs@)
+# - We watch for emails where the alias (alex@) is in To/CC
+IMAP_SERVER = os.getenv("IMAP_SERVER", "imap.zoho.com")
+IMAP_USER = os.getenv("IMAP_USER", "cs@stblstrategies.com")  # Primary account for login
+WATCH_EMAIL = os.getenv("WATCH_EMAIL", "alex@stblstrategies.com")  # Alias to watch in To/CC
+APP_PASSWORD = os.getenv("ZOHO_MAIL_APP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD")
 
 # Authorized senders (emails that can trigger workflows)
 # Can be set via environment variable as comma-separated list, or defaults to these
@@ -193,7 +207,12 @@ def get_email_body(msg) -> str:
     return body
 
 
-def trigger_workflow(platform: str, url: str, client_email: str = None) -> bool:
+def trigger_workflow(
+    platform: str,
+    url: str,
+    client_email: str = None,
+    email_context: dict = None
+) -> bool:
     """
     Trigger the orchestrator workflow.
 
@@ -201,13 +220,28 @@ def trigger_workflow(platform: str, url: str, client_email: str = None) -> bool:
         platform: 'ESP' or 'SAGE'
         url: The presentation URL
         client_email: Optional client email for Zoho contact lookup
+        email_context: Optional dict with email context for reply-all
 
     Returns:
         True if workflow was triggered successfully, False otherwise
     """
+    import json
+    import tempfile
+
     logger.info(f"Triggering {platform} workflow: {url}")
     if client_email:
         logger.info(f"  Client email: {client_email}")
+
+    # Write email context to temp file if provided
+    email_context_path = None
+    if email_context:
+        try:
+            fd, email_context_path = tempfile.mkstemp(suffix=".json", prefix="email_context_")
+            with os.fdopen(fd, 'w') as f:
+                json.dump(email_context, f)
+            logger.info(f"  Email context saved to: {email_context_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save email context: {e}")
 
     # Build command - use promo-parser CLI from venv
     promo_parser_cmd = os.path.join(PROJECT_PATH, "venv", "bin", "promo-parser")
@@ -242,6 +276,10 @@ def trigger_workflow(platform: str, url: str, client_email: str = None) -> bool:
     # Add client email for Zoho contact lookup if available
     if client_email:
         cmd.extend(['--client-email', client_email])
+
+    # Add email context for reply-all email delivery
+    if email_context_path:
+        cmd.extend(['--email-context', email_context_path])
 
     try:
         # Create log file path based on timestamp
@@ -337,11 +375,11 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
             continue
 
         # Check if user is CC'd (or in To: for testing)
-        is_ccd = is_user_in_cc(cc_header, EMAIL_ADDRESS)
-        is_direct = EMAIL_ADDRESS.lower() in to_header.lower()
+        is_ccd = is_user_in_cc(cc_header, WATCH_EMAIL)
+        is_direct = WATCH_EMAIL.lower() in to_header.lower()
 
         if not is_ccd and not is_direct:
-            logger.info(f"  Skipped: {EMAIL_ADDRESS} not in CC or To")
+            logger.info(f"  Skipped: {WATCH_EMAIL} not in CC or To")
             continue
 
         # Extract body and look for URL
@@ -351,9 +389,9 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
         if platform and url:
             logger.info(f"  Found {platform} URL: {url}")
 
-            # Extract client email from To: header (excluding our trigger email)
+            # Extract client email from To: header (excluding our watch email)
             to_emails = extract_all_emails(to_header)
-            client_emails = [e for e in to_emails if EMAIL_ADDRESS.lower() not in e.lower()]
+            client_emails = [e for e in to_emails if WATCH_EMAIL.lower() not in e.lower()]
             client_email = client_emails[0] if client_emails else None
 
             if client_email:
@@ -361,7 +399,19 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
             else:
                 logger.info(f"  No client email found in To: header")
 
-            if trigger_workflow(platform, url, client_email=client_email):
+            # Build email context for reply-all functionality
+            from_addr = extract_email_address(from_header)
+            cc_emails = extract_all_emails(cc_header)
+            email_context = {
+                "from_address": from_addr,
+                "to_addresses": to_emails,
+                "cc_addresses": cc_emails,
+                "subject": subject,
+                "message_id": msg.get("Message-ID", "")
+            }
+            logger.info(f"  Email context: from={from_addr}, to={len(to_emails)}, cc={len(cc_emails)}")
+
+            if trigger_workflow(platform, url, client_email=client_email, email_context=email_context):
                 mark_email_processed(email_id_str)
                 processed_ids.add(email_id_str)
                 logger.info(f"  Workflow triggered successfully")
@@ -379,9 +429,9 @@ def watch_inbox() -> None:
     while True:
         mail = None
         try:
-            logger.info("Connecting to Gmail IMAP...")
+            logger.info(f"Connecting to {IMAP_SERVER} as {IMAP_USER}...")
             mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-            mail.login(EMAIL_ADDRESS, APP_PASSWORD)
+            mail.login(IMAP_USER, APP_PASSWORD)
             mail.select('INBOX')
             logger.info("Connected! Watching for new emails...")
 
@@ -449,7 +499,7 @@ def watch_inbox() -> None:
 
                     if idle_timeout >= 6:  # ~30 minutes
                         # Reconnect to ensure fresh connection
-                        logger.info("Periodic reconnection to Gmail...")
+                        logger.info("Periodic reconnection to mail server...")
                         break
 
         except imaplib.IMAP4.abort as e:
@@ -482,12 +532,12 @@ def main():
 
     # Validate required configuration
     if not APP_PASSWORD:
-        print("Error: GMAIL_APP_PASSWORD environment variable not set")
+        print("Error: ZOHO_MAIL_APP_PASSWORD environment variable not set")
         print("")
-        print("To get an app password:")
-        print("1. Go to https://myaccount.google.com/apppasswords")
-        print("2. Create an app password for 'Mail'")
-        print("3. Set it: export GMAIL_APP_PASSWORD='xxxx-xxxx-xxxx-xxxx'")
+        print("To get a Zoho app password:")
+        print("1. Go to https://accounts.zoho.com/home#security/app_passwords")
+        print("2. Create an app password for 'IMAP'")
+        print("3. Set it: export ZOHO_MAIL_APP_PASSWORD='your-app-password'")
         sys.exit(1)
 
     if not AUTHORIZED_SENDERS:
@@ -498,7 +548,8 @@ def main():
     # Print configuration
     logger.info("=" * 60)
     logger.info("Email Trigger Watcher Starting")
-    logger.info(f"  Email: {EMAIL_ADDRESS}")
+    logger.info(f"  IMAP Login: {IMAP_USER}")
+    logger.info(f"  Watch Email: {WATCH_EMAIL} (alias)")
     logger.info(f"  Authorized Senders:")
     for sender in AUTHORIZED_SENDERS:
         logger.info(f"    - {sender}")

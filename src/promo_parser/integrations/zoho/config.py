@@ -38,6 +38,26 @@ ZOHO_TOKEN_URL: str = os.getenv("ZOHO_TOKEN_URL", "https://accounts.zoho.com/oau
 
 
 # =============================================================================
+# Zoho Mail API Configuration
+# =============================================================================
+
+# Zoho Mail account ID (get via: GET https://mail.zoho.com/api/accounts)
+ZOHO_MAIL_ACCOUNT_ID: Optional[str] = os.getenv("ZOHO_MAIL_ACCOUNT_ID")
+
+# Mail API uses separate OAuth credentials with ZohoMail scopes
+ZOHO_MAIL_CLIENT_ID: Optional[str] = os.getenv("ZOHO_MAIL_CLIENT_ID")
+ZOHO_MAIL_CLIENT_SECRET: Optional[str] = os.getenv("ZOHO_MAIL_CLIENT_SECRET")
+ZOHO_MAIL_REFRESH_TOKEN: Optional[str] = os.getenv("ZOHO_MAIL_REFRESH_TOKEN")
+
+# Default sender and CC addresses
+ZOHO_MAIL_FROM_ADDRESS: str = os.getenv("ZOHO_MAIL_FROM_ADDRESS", "alex@stblstrategies.com")
+ZOHO_MAIL_CC_ALWAYS: str = os.getenv("ZOHO_MAIL_CC_ALWAYS", "koell@stblstrategies.com")
+
+# Zoho Mail API base URL
+ZOHO_MAIL_API_BASE_URL: str = os.getenv("ZOHO_MAIL_API_BASE_URL", "https://mail.zoho.com/api")
+
+
+# =============================================================================
 # Item Master Defaults
 # =============================================================================
 

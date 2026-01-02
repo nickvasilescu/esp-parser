@@ -498,7 +498,7 @@ class ZohoItemMasterAgent:
         product_index = tool_input.get("product_index")
         client_account_number = tool_input.get("client_account_number")
         include_variations = tool_input.get("include_variations", False)
-        include_fees = tool_input.get("include_fees", False)
+        include_fees = tool_input.get("include_fees", True)
 
         if self._unified_output is None:
             return json.dumps({"error": "No unified output loaded"})

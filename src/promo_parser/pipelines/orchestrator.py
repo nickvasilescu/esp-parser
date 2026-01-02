@@ -937,7 +937,8 @@ class Orchestrator:
         zoho_quote: bool = False,
         calculator: bool = False,
         output_dir: str = OUTPUT_DIR,
-        client_email: Optional[str] = None
+        client_email: Optional[str] = None,
+        email_context_path: Optional[str] = None
     ):
         """
         Initialize the orchestrator.
@@ -955,6 +956,7 @@ class Orchestrator:
             calculator: If True, generate client calculator Excel and upload to Zoho WorkDrive
             output_dir: Directory for output files
             client_email: Optional client email for Zoho contact lookup
+            email_context_path: Optional path to JSON file with email context for reply-all
         """
         self.url = url
         self.computer_id = computer_id
@@ -967,6 +969,7 @@ class Orchestrator:
         self.calculator = calculator
         self.output_dir = output_dir
         self.client_email = client_email
+        self.email_context_path = email_context_path
         
         # Generate or use provided job ID
         self.job_id = job_id or f"esp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -1266,6 +1269,16 @@ class Orchestrator:
                     from promo_parser.integrations.zoho.client import ZohoClient
                     zoho_client = ZohoClient()
 
+                    # Inject email context for reply-all functionality if provided
+                    if self.email_context_path:
+                        try:
+                            with open(self.email_context_path, 'r') as f:
+                                email_context = json.load(f)
+                            normalized_result["_email_context"] = email_context
+                            logger.info(f"Email context loaded from: {self.email_context_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to load email context: {e}")
+
                     calc_agent = CalculatorGeneratorAgent(zoho_client=zoho_client, state_manager=self.state_manager)
                     calc_result = calc_agent.generate_calculator(
                         unified_output=normalized_result,
@@ -1501,6 +1514,12 @@ Environment Variables:
         help="Client email address for Zoho contact lookup (passed from email trigger)"
     )
 
+    parser.add_argument(
+        "--email-context",
+        type=str,
+        help="Path to JSON file with email context for reply-all delivery (from email trigger)"
+    )
+
     args = parser.parse_args()
     
     # Set logging level
@@ -1526,7 +1545,8 @@ Environment Variables:
         zoho_dry_run=args.zoho_dry_run,
         zoho_quote=args.zoho_quote,
         calculator=args.calculator,
-        client_email=args.client_email
+        client_email=args.client_email,
+        email_context_path=args.email_context
     )
     
     try:

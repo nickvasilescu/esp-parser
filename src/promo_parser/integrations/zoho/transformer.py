@@ -493,6 +493,33 @@ def parse_additional_charges_text(text: str) -> List[Dict[str, Any]]:
     return fees
 
 
+def build_fee_sku(client_num: str, base_code: str, fee_type: str, deco_method: str = None) -> str:
+    """
+    Build fee SKU in the new format: {clientNum}-{baseCode}+{fee_type}
+
+    This format links fees to their parent product SKU, allowing them to
+    persist through Quote→PO conversion in Zoho Books.
+
+    Examples:
+      - 10041-75610+setup
+      - 10041-75610+pms
+      - 10041-75610+additional_color_SCREENPRINT
+
+    Args:
+        client_num: Client account number (e.g., "10041")
+        base_code: Product vendor SKU (e.g., "75610")
+        fee_type: Type of fee (e.g., "setup", "pms", "additional_color")
+        deco_method: Optional decoration method to append
+
+    Returns:
+        SKU string in format {clientNum}-{baseCode}+{fee_type}
+    """
+    fee_suffix = sanitize_for_sku(fee_type.lower(), 20)
+    if deco_method:
+        fee_suffix += f"_{sanitize_for_sku(deco_method, 15)}"
+    return f"{client_num}-{base_code}+{fee_suffix}"
+
+
 def build_fee_items(
     product: Dict[str, Any],
     client_account_number: str,
@@ -526,14 +553,11 @@ def build_fee_items(
         fee_name = fee.get("name", "Fee")
         deco_method = fee.get("decoration_method", "")
         
-        # Build SKU/name
-        sku_parts = [client_num, "FEE", fee_type.upper(), base_code]
-        if deco_method:
-            sku_parts.append(sanitize_for_sku(deco_method, 15))
-        sku = "-".join(sku_parts)
-        
+        # Build SKU in new format: {clientNum}-{baseCode}+{fee_type}
+        sku = build_fee_sku(client_num, base_code, fee_type, deco_method if deco_method else None)
+
         # Build descriptive name
-        name = f"{client_num}-FEE-{fee_type.upper()}-{fee_name}"
+        name = f"{fee_name} - {fee_type.upper()}"
         if deco_method:
             name += f" ({deco_method})"
         
@@ -563,14 +587,9 @@ def build_fee_items(
         parsed_fees = parse_additional_charges_text(additional_text)
         for fee in parsed_fees:
             fee_type = sanitize_for_sku(fee.get("fee_type", "FEE"), 15)
-            
-            sku_parts = [client_num, "FEE", fee_type.upper(), base_code]
-            sku = "-".join(sku_parts)
-            
-            # Make SKU unique if name has detail
-            fee_name_clean = sanitize_for_sku(fee.get("name", ""), 20)
-            if fee_name_clean:
-                sku = f"{sku}-{fee_name_clean}"
+
+            # Build SKU in new format: {clientNum}-{baseCode}+{fee_type}
+            sku = build_fee_sku(client_num, base_code, fee_type)
             
             payload = {
                 "name": sku,
@@ -599,7 +618,8 @@ def build_fee_items(
             # Try to extract percentage
             percent_match = re.search(r'(\d+(?:\.\d+)?)\s*%', disclaimer)
             
-            sku = f"{client_num}-FEE-SURCHARGE-{base_code}"
+            # Build SKU in new format: {clientNum}-{baseCode}+surcharge
+            sku = build_fee_sku(client_num, base_code, "surcharge")
             
             payload = {
                 "name": sku,
@@ -1235,9 +1255,10 @@ def validate_item_payload(payload: Dict[str, Any]) -> List[str]:
         errors.append("Missing required field: sku")
 
     # SKU format validation
+    # Formats: {ClientAcct}-{VendorSKU} for products, {ClientAcct}-{VendorSKU}+{fee_type} for fees
     sku = payload.get("sku", "")
     if "-" not in sku:
-        errors.append(f"SKU format invalid (expected [ClientAcct]-[VendorSKU]): {sku}")
+        errors.append(f"SKU format invalid (expected [ClientAcct]-[VendorSKU] or [ClientAcct]-[VendorSKU]+[fee]): {sku}")
 
     # Price validation (warn, don't fail)
     if payload.get("rate") is None:
@@ -1737,7 +1758,15 @@ def build_estimate_payload(
             product_subtotal = first_tier["rate"] * first_tier["quantity"]
 
         # 2. Setup fee (if exists)
-        setup_line = build_setup_fee_line_item(product)
+        # Look up setup fee item_id from Item Master using new SKU format: {clientNum}-{baseCode}+setup
+        setup_fee_item_id = None
+        for sku, iid in item_master_map.items():
+            if base_code in sku and "+setup" in sku:
+                setup_fee_item_id = iid
+                logger.debug(f"Found setup fee Item Master link: {sku} -> {iid}")
+                break
+
+        setup_line = build_setup_fee_line_item(product, setup_fee_item_id)
         if setup_line:
             all_line_items.append(setup_line)
 
