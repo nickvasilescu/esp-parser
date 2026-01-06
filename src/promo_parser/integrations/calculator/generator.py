@@ -253,6 +253,9 @@ class CalculatorGeneratorAgent:
             client_name = unified_output.get("client", {}).get("company") or \
                           unified_output.get("client", {}).get("name") or "Client"
 
+        # Store for use in email tool
+        self._client_name = client_name
+
         # Build initial message with context
         initial_message = f"""Generate a calculator spreadsheet for:
 
@@ -504,8 +507,11 @@ Product summary:
             subject_prefix = tool_input.get("subject_prefix", "Re: ")
             subject = f"{subject_prefix}{original_subject}" if not original_subject.startswith("Re:") else original_subject
 
-            # Build email body
-            client_name = self._unified_output.get("client", {}).get("company", "")
+            # Build email body - use stored client_name from Zoho lookup
+            client_name = getattr(self, '_client_name', None) or \
+                          self._unified_output.get("client", {}).get("company") or \
+                          self._unified_output.get("client", {}).get("name") or \
+                          "Client"
             product_count = len(self._unified_output.get("products", []))
             file_name = os.path.basename(file_path)
 
