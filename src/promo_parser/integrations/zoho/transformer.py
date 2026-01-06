@@ -23,6 +23,9 @@ from promo_parser.integrations.zoho.config import ZOHO_ITEM_DEFAULTS, CUSTOM_FIE
 
 logger = logging.getLogger(__name__)
 
+# Zoho custom field character limit
+CUSTOM_FIELD_MAX_LENGTH = 255
+
 
 # =============================================================================
 # Category Classification
@@ -742,18 +745,30 @@ def map_custom_fields(
     notes = product.get("notes", {})
     metadata = product.get("metadata", {})
 
-    # Helper to add field if discovered (retain JSON handling)
+    # Helper to add field if discovered (with length truncation)
     def add_field(field_name: str, value: Any):
         field_id = discovered_fields.get(field_name)
         if field_id and value is not None:
             # Convert complex types to JSON string
             if isinstance(value, (dict, list)):
                 value = json.dumps(value)
+
+            # Convert to string
+            str_value = str(value) if value else ""
+
+            # Truncate if exceeds Zoho's 255-char limit for custom fields
+            if len(str_value) > CUSTOM_FIELD_MAX_LENGTH:
+                logger.warning(
+                    f"Truncating custom field '{field_name}' from {len(str_value)} "
+                    f"to {CUSTOM_FIELD_MAX_LENGTH} chars"
+                )
+                str_value = str_value[:CUSTOM_FIELD_MAX_LENGTH - 3] + "..."
+
             custom_fields.append({
                 "customfield_id": field_id,
-                "value": str(value) if value else ""
+                "value": str_value
             })
-            logger.debug(f"Mapped custom field '{field_name}' = {str(value)[:50]}...")
+            logger.debug(f"Mapped custom field '{field_name}' = {str_value[:50]}...")
 
     # === Color Fields ===
     # Color Options (multi-line, all available colors)
