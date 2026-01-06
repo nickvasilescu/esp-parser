@@ -1829,10 +1829,20 @@ def build_estimate_payload(
 
     notes = "\n".join(notes_parts) if notes_parts else "Quote generated from presentation data"
 
+    # Build reference_number from presentation title and date
+    # Format: "Presentation Title - YYYY-MM-DD" (title truncated to 40 chars)
+    reference_parts = []
+    if pres_title:
+        reference_parts.append(pres_title[:40])
+    reference_parts.append(estimate_date)
+    reference_number = " - ".join(reference_parts) if reference_parts else estimate_date
+
     logger.info(f"Built estimate with {len(all_line_items)} total line items")
+    logger.info(f"Reference number: {reference_number}")
 
     return {
         "customer_id": customer_id,
+        "reference_number": reference_number,
         "date": estimate_date,
         "expiry_date": expiry_date,
         "line_items": all_line_items,

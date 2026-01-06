@@ -375,12 +375,16 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
             continue
 
         # Check if user is CC'd (or in To: for testing)
+        # NOTE: BCC support - if email arrived and is from authorized sender,
+        # we process it even if WATCH_EMAIL isn't visible in CC/To headers.
+        # This handles the case where alex@ is BCC'd instead of CC'd.
         is_ccd = is_user_in_cc(cc_header, WATCH_EMAIL)
         is_direct = WATCH_EMAIL.lower() in to_header.lower()
 
         if not is_ccd and not is_direct:
-            logger.info(f"  Skipped: {WATCH_EMAIL} not in CC or To")
-            continue
+            # Email is from authorized sender and arrived in our mailbox,
+            # so it was sent to us somehow (likely BCC)
+            logger.info(f"  Note: {WATCH_EMAIL} not visible in CC/To (possibly BCC'd) - proceeding anyway")
 
         # Extract body and look for URL
         body = get_email_body(msg)

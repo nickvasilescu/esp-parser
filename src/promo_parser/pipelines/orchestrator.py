@@ -1198,6 +1198,25 @@ class Orchestrator:
                     # Emit state: creating quote
                     self.state_manager.update(WorkflowStatus.ZOHO_CREATING_QUOTE.value)
 
+                    # CRITICAL FIX: Inject customer email from email context
+                    # The email TO address is the most reliable way to identify the customer
+                    if self.email_context_path:
+                        try:
+                            with open(self.email_context_path, 'r') as f:
+                                email_ctx = json.load(f)
+                            # Get the TO address as the customer email
+                            to_addresses = email_ctx.get("to_addresses", [])
+                            if to_addresses:
+                                client_email_from_context = to_addresses[0]
+                                # Inject into normalized_result.client
+                                if not normalized_result.get("client"):
+                                    normalized_result["client"] = {}
+                                if not normalized_result["client"].get("email"):
+                                    normalized_result["client"]["email"] = client_email_from_context
+                                    logger.info(f"Customer email from email context: {client_email_from_context}")
+                        except Exception as e:
+                            logger.warning(f"Failed to load email context for quote: {e}")
+
                     # Build item_master_map from previous upload results
                     item_master_map = {}
                     if zoho_result and hasattr(zoho_result, 'items'):

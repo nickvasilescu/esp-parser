@@ -342,17 +342,32 @@ class ZohoQuoteAgent:
 
     def _tool_search_customer_by_name(self, tool_input: Dict[str, Any]) -> str:
         """Search for a customer by name, email, or company."""
+        search_email = tool_input.get("email")
+
         contacts = self.zoho_client.search_contacts(
             name=tool_input.get("name"),
-            email=tool_input.get("email"),
+            email=search_email,
             company_name=tool_input.get("company_name")
         )
 
         # Filter to customers only
         customers = [c for c in contacts if c.get("contact_type") == "customer"]
 
+        # CRITICAL: If searching by email, prioritize exact email match
+        if search_email and customers:
+            exact_email_match = [
+                c for c in customers
+                if c.get("email", "").lower() == search_email.lower()
+            ]
+            if exact_email_match:
+                logger.info(f"Found exact email match for: {search_email}")
+                customers = exact_email_match
+            else:
+                logger.warning(f"No exact email match for {search_email}, returning first result")
+
         if customers:
             customer = customers[0]
+            logger.info(f"Customer found: {customer.get('contact_name')} ({customer.get('email')})")
             return json.dumps({
                 "found": True,
                 "customer_id": customer.get("contact_id"),
@@ -362,6 +377,7 @@ class ZohoQuoteAgent:
                 "email": customer.get("email")
             })
         else:
+            logger.warning(f"No customer found for search: name={tool_input.get('name')}, email={search_email}")
             return json.dumps({
                 "found": False,
                 "message": "No matching customer found. Cannot create quote without a customer."
@@ -685,12 +701,14 @@ Product {i}: {item.get('name', 'Unknown')}
 """
             product_summaries.append(summary)
 
-        # Extract account number hint
-        account_hint = ""
-        if client.get("account_number"):
-            account_hint = f"Account Number: {client.get('account_number')}"
+        # Extract search hint - prioritize email (most reliable), then account number, then name
+        search_hint = ""
+        if client.get("email"):
+            search_hint = f"**SEARCH BY EMAIL FIRST: {client.get('email')}** (most reliable method)"
+        elif client.get("account_number"):
+            search_hint = f"Account Number: {client.get('account_number')}"
         elif client.get("name"):
-            account_hint = f"(Search by name: {client.get('name')})"
+            search_hint = f"(Fallback: Search by name: {client.get('name')})"
 
         message = f"""
 # Quote Creation Request
@@ -704,7 +722,7 @@ Product {i}: {item.get('name', 'Unknown')}
 - Name: {client.get('name') or 'N/A'}
 - Company: {client.get('company') or 'N/A'}
 - Email: {client.get('email') or 'N/A'}
-- {account_hint}
+- {search_hint}
 
 ## Presenter Information
 - Name: {presenter.get('name') or 'N/A'}
@@ -719,7 +737,11 @@ Product {i}: {item.get('name', 'Unknown')}
 ---
 
 Please create a DRAFT quote:
-1. Search for the customer (try account number first, then name)
+1. **CRITICAL**: Search for the customer:
+   - **Search by EMAIL FIRST** if available (most reliable - use the email shown above)
+   - Only if email search fails, try account number
+   - Only as last resort, search by name
+   - **VERIFY** the customer's email matches before proceeding
 2. Get Item Master entries for linking
 3. Create the draft quote with all products and line items
 4. Report completion with the estimate number
