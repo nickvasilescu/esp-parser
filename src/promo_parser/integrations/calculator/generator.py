@@ -19,6 +19,16 @@ from openpyxl.styles import Font, PatternFill, Border, Side
 
 from promo_parser.integrations.zoho.config import ZOHO_QUOTE_DEFAULTS
 
+# Import ZohoClient for customer lookup (optional - for file naming)
+try:
+    from promo_parser.integrations.zoho.client import ZohoClient
+except ImportError:
+    ZohoClient = None
+
+# Logger setup
+import logging
+logger = logging.getLogger(__name__)
+
 # Import JobStateManager for state updates (optional dependency)
 try:
     from promo_parser.core.state import JobStateManager, WorkflowStatus
@@ -127,11 +137,11 @@ CALCULATOR_AGENT_SYSTEM_PROMPT = """You are a Calculator Generator agent.
 ## Workflow
 
 STEP 1: Call generate_calculator_xlsx
-- File name priority:
-  1. If presentation_title provided: "{PresentationTitle} Calc {YYYYMMDD}"
-  2. Fallback: "{ClientName} Promo Calc {YYYYMMDD_HHMMSS}"
-- Example with title: "Spring 2026 Promo Lineup Calc 20260101"
-- Example fallback: "Otava Promo Calc 20260101_143022"
+- File name format: "{Title} - {YYYY-MM-DD}"
+- If presentation_title provided: "{PresentationTitle} - {YYYY-MM-DD}"
+- Fallback: "{ClientName} Calc - {YYYY-MM-DD}"
+- Example with title: "Spring Promo 2025 - 2026-01-06"
+- Example fallback: "Acme Corp Calc - 2026-01-06"
 - Clean the name (remove special characters)
 
 STEP 2: Call upload_to_cost_calculators
@@ -214,12 +224,34 @@ class CalculatorGeneratorAgent:
         self._result = None
         self._generated_file_path = None
 
-        # Extract client info and presentation title
-        client_name = unified_output.get("client", {}).get("company") or \
-                      unified_output.get("client", {}).get("name") or "Client"
+        # Extract presentation metadata
         metadata = unified_output.get("metadata", {})
         presentation_title = metadata.get("presentation_title")
         products = unified_output.get("products", [])
+
+        # Extract client name - prefer Zoho lookup by email TO address
+        client_name = None
+        email_context = unified_output.get("_email_context")
+
+        # Try to get customer name from Zoho via email lookup
+        if email_context and ZohoClient:
+            to_addresses = email_context.get("to_addresses", [])
+            if to_addresses:
+                customer_email = to_addresses[0]
+                try:
+                    zoho_client = ZohoClient()
+                    contacts = zoho_client.search_contacts(email=customer_email)
+                    customers = [c for c in contacts if c.get("contact_type") == "customer"]
+                    if customers:
+                        client_name = customers[0].get("contact_name") or customers[0].get("company_name")
+                        logger.info(f"Customer from Zoho lookup ({customer_email}): {client_name}")
+                except Exception as e:
+                    logger.warning(f"Failed to lookup customer in Zoho: {e}")
+
+        # Fallback to unified_output.client, then "Client"
+        if not client_name:
+            client_name = unified_output.get("client", {}).get("company") or \
+                          unified_output.get("client", {}).get("name") or "Client"
 
         # Build initial message with context
         initial_message = f"""Generate a calculator spreadsheet for:
@@ -251,13 +283,15 @@ Product summary:
 
         # Dry run mode - just generate locally
         if dry_run:
-            # Use presentation title if available, otherwise fallback to client name
+            # File naming format: "Title - YYYY-MM-DD" (e.g., "Spring Promo 2025 - 2026-01-06.xlsx")
+            date_str = datetime.now().strftime('%Y-%m-%d')
             if presentation_title:
-                clean_name = "".join(c for c in presentation_title if c.isalnum() or c in " -_").strip()
-                file_name = f"{clean_name} Calc {datetime.now().strftime('%Y%m%d')}"
+                clean_title = "".join(c for c in presentation_title if c.isalnum() or c in " -_").strip()
+                file_name = f"{clean_title} - {date_str}"
             else:
+                # Fallback to client name if no presentation title
                 clean_name = "".join(c for c in client_name if c.isalnum() or c in " -_").strip()
-                file_name = f"{clean_name} Promo Calc {datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                file_name = f"{clean_name} Calc - {date_str}"
 
             try:
                 file_path = self._generate_xlsx(file_name)
