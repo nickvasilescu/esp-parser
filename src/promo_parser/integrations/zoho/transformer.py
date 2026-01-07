@@ -120,7 +120,7 @@ def extract_vendor_website(vendor: Dict[str, Any]) -> Optional[str]:
         vendor: Unified vendor dictionary
 
     Returns:
-        Website domain (without protocol) or None
+        Full URL with https:// protocol (e.g., https://example.com) or None
     """
     # 1. Try direct website first
     website = vendor.get("website")
@@ -130,7 +130,7 @@ def extract_vendor_website(vendor: Dict[str, Any]) -> Optional[str]:
         website = website.replace("https://", "").replace("http://", "")
         website = website.replace("www.", "")
         website = website.rstrip("/")
-        return website
+        return f"https://{website}"
 
     # 2. Fallback: infer from email domain
     email = vendor.get("email")
@@ -151,7 +151,7 @@ def extract_vendor_website(vendor: Dict[str, Any]) -> Optional[str]:
                                  "orders", "customercare", "support"}
                 if parts[0] in mail_prefixes:
                     domain = ".".join(parts[1:])
-            return domain
+            return f"https://{domain}"
 
     return None
 
