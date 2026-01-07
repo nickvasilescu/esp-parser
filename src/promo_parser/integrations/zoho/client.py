@@ -34,6 +34,10 @@ from promo_parser.integrations.zoho.config import (
 
 logger = logging.getLogger(__name__)
 
+# Fields that cannot be changed for items with transactions (Zoho API restriction)
+# Error code 2076: "Product type cannot be changed for Items having transactions"
+ZOHO_ITEM_IMMUTABLE_FIELDS = ["item_type", "product_type"]
+
 
 class ZohoAPIError(Exception):
     """Exception raised for Zoho API errors."""
@@ -362,15 +366,30 @@ class ZohoClient:
     def update_item(self, item_id: str, item_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Update an existing item.
-        
+
+        Note: Certain fields (item_type, product_type) cannot be changed
+        for items that have existing transactions in Zoho. These are
+        automatically stripped from the update payload.
+
         Args:
             item_id: Zoho item ID
             item_data: Updated item data
-            
+
         Returns:
             Updated item data
         """
-        response = self._make_request("PUT", f"/items/{item_id}", json_data=item_data)
+        # Strip fields that cannot be changed for items with transactions
+        update_payload = {
+            k: v for k, v in item_data.items()
+            if k not in ZOHO_ITEM_IMMUTABLE_FIELDS
+        }
+
+        # Log if we're stripping fields
+        stripped = [k for k in item_data.keys() if k in ZOHO_ITEM_IMMUTABLE_FIELDS]
+        if stripped:
+            logger.debug(f"Stripping immutable fields from update: {stripped}")
+
+        response = self._make_request("PUT", f"/items/{item_id}", json_data=update_payload)
         return response.get("item", {})
     
     def upsert_item(self, item_data: Dict[str, Any], unique_field: str = "sku") -> Dict[str, Any]:
