@@ -149,6 +149,7 @@ CUSTOM_FIELD_PATTERNS: Dict[str, List[str]] = {
     "vendor_address": ["vendor address", "supplier address"],
     "vendor_account_num": ["vendor account", "our account", "customer number"],
     "vendor_cs_rep": ["cs rep", "customer service rep"],
+    "vendor_website": ["item mfg web address", "mfg web address", "vendor website", "manufacturer website", "supplier website"],
 
     # Industry IDs
     "asi_number": ["asi number", "asi"],

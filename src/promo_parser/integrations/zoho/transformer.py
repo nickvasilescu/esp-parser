@@ -105,6 +105,58 @@ def classify_product_category(
 
 
 # =============================================================================
+# Vendor Website Extraction
+# =============================================================================
+
+def extract_vendor_website(vendor: Dict[str, Any]) -> Optional[str]:
+    """
+    Extract vendor website URL, with fallback to inferring from email domain.
+
+    Priority:
+    1. vendor.website (direct extraction from PDF)
+    2. Inferred from vendor.email domain
+
+    Args:
+        vendor: Unified vendor dictionary
+
+    Returns:
+        Website domain (without protocol) or None
+    """
+    # 1. Try direct website first
+    website = vendor.get("website")
+    if website:
+        # Normalize: strip protocol, www prefix, and trailing slashes
+        website = website.lower()
+        website = website.replace("https://", "").replace("http://", "")
+        website = website.replace("www.", "")
+        website = website.rstrip("/")
+        return website
+
+    # 2. Fallback: infer from email domain
+    email = vendor.get("email")
+    if email and "@" in email:
+        domain = email.split("@")[-1].lower()
+
+        # Skip generic email providers
+        generic_domains = {
+            "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
+            "aol.com", "icloud.com", "mail.com", "protonmail.com"
+        }
+
+        if domain not in generic_domains:
+            # Handle mail subdomains (orders.company.com -> company.com)
+            parts = domain.split(".")
+            if len(parts) > 2:
+                mail_prefixes = {"mail", "email", "smtp", "mx", "webmail",
+                                 "orders", "customercare", "support"}
+                if parts[0] in mail_prefixes:
+                    domain = ".".join(parts[1:])
+            return domain
+
+    return None
+
+
+# =============================================================================
 # SKU/MPN Construction
 # =============================================================================
 
@@ -936,6 +988,10 @@ def map_custom_fields(
     add_field("vendor_contact", vendor.get("contact_name"))
     add_field("vendor_email", vendor.get("email"))
     add_field("vendor_phone", vendor.get("phone"))
+
+    # Vendor Website (Item Mfg Web Address) - with email domain fallback
+    vendor_website = extract_vendor_website(vendor)
+    add_field("vendor_website", vendor_website)
 
     # Vendor Address (formatted)
     vendor_addr = vendor.get("address", {})
