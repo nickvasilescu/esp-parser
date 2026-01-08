@@ -1,11 +1,32 @@
-import React from "react";
-import { Activity, Bell, User } from "lucide-react";
+"use client";
+
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Bell, User, LogOut, Loader2 } from "lucide-react";
 
 interface HeaderProps {
   title?: string;
 }
 
 export default function Header({ title = "CUA | Automation Dashboard" }: HeaderProps) {
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout failed:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <header className="bg-background/80 backdrop-blur-md border-b border-border py-4 px-6 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center gap-3">
@@ -34,6 +55,18 @@ export default function Header({ title = "CUA | Automation Dashboard" }: HeaderP
             <User className="w-4 h-4" />
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="ml-2 p-2 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-md transition-all disabled:opacity-50"
+          title="Sign out"
+        >
+          {isLoggingOut ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <LogOut className="w-4 h-4" />
+          )}
+        </button>
       </div>
     </header>
   );
