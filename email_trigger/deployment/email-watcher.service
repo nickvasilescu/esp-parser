@@ -2,6 +2,9 @@
 Description=Email Trigger Watcher for Promo Pipeline
 Documentation=https://github.com/your-repo
 After=network.target
+# Restart limits - prevent infinite silent restarts
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -9,8 +12,9 @@ User=root
 WorkingDirectory=/opt/promo-pipeline
 EnvironmentFile=/opt/promo-pipeline/.env
 ExecStart=/opt/promo-pipeline/venv/bin/python /opt/promo-pipeline/email_trigger/email_watcher.py
-Restart=always
-RestartSec=10
+Restart=on-failure
+RestartSec=30
+KillMode=process
 StandardOutput=journal
 StandardError=journal
 

@@ -24,6 +24,7 @@ import imaplib
 import email
 from email.header import decode_header
 import re
+import socket
 import subprocess
 import time
 import logging
@@ -66,6 +67,9 @@ SAGE_PREFIX = "https://www.viewpresentation.com/"
 # Directory for tracking processed emails
 SCRIPT_DIR = Path(__file__).parent.absolute()
 PROCESSED_FILE = SCRIPT_DIR / "processed_emails.txt"
+
+# Health monitoring - detect reconnect loops
+MAX_CONSECUTIVE_FAILURES = 10  # Exit after this many consecutive failures
 
 # Logging setup - log to file if on server, otherwise just console
 LOG_FILE = "/var/log/email-watcher.log" if os.path.exists("/var/log") else None
@@ -358,6 +362,11 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
             logger.warning(f"Failed to fetch email {email_id_str}")
             continue
 
+        # Guard against None response (email may have been moved/deleted between SEARCH and FETCH)
+        if not msg_data or not msg_data[0] or msg_data[0][1] is None:
+            logger.warning(f"Empty fetch result for email {email_id_str}, skipping")
+            continue
+
         raw_email = msg_data[0][1]
         msg = email.message_from_bytes(raw_email)
 
@@ -423,12 +432,18 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
                 logger.error(f"  Failed to trigger workflow")
         else:
             logger.info(f"  No valid presentation URL found in email body")
+            # Track this email so we don't reprocess it every IDLE cycle
+            processed_ids.add(email_id_str)
+            mark_email_processed(email_id_str)
 
 
 def watch_inbox() -> None:
     """Main loop using IMAP IDLE."""
     processed_ids = load_processed_emails()
     logger.info(f"Loaded {len(processed_ids)} previously processed email IDs")
+
+    # Track consecutive failures to detect reconnect loops
+    consecutive_failures = 0
 
     while True:
         mail = None
@@ -439,6 +454,9 @@ def watch_inbox() -> None:
             mail.select('INBOX')
             logger.info("Connected! Watching for new emails...")
 
+            # Reset failure counter on successful connection
+            consecutive_failures = 0
+
             # Process any existing unread emails first
             process_new_emails(mail, processed_ids)
 
@@ -446,7 +464,7 @@ def watch_inbox() -> None:
             idle_timeout = 0
             while True:
                 # IMAP IDLE - wait for new mail
-                # Gmail's IDLE timeout is about 10 minutes, we'll refresh at 5
+                # Zoho's IDLE timeout is typically 10-29 minutes
                 tag = mail._new_tag().decode()
                 mail.send(f'{tag} IDLE\r\n'.encode())
 
@@ -458,12 +476,19 @@ def watch_inbox() -> None:
                     break
 
                 # Wait for EXISTS notification (new mail) or timeout
-                # Using 2-minute timeout for more frequent polling fallback
-                mail.sock.settimeout(120)  # 2 minute timeout
+                # Using 10-minute timeout - IDLE is push-based, longer is fine
+                mail.sock.settimeout(600)  # 10 minute timeout
 
                 try:
                     while True:
                         response = mail.readline()
+
+                        if not response:
+                            # Empty response = server closed connection
+                            # Without this check, readline() returns b'' instantly
+                            # in a tight loop burning 100% CPU
+                            logger.warning("Empty IDLE response - connection dead, reconnecting...")
+                            raise ConnectionResetError("Server closed connection (empty readline)")
 
                         if b'EXISTS' in response:
                             # New email arrived!
@@ -472,6 +497,8 @@ def watch_inbox() -> None:
                             # Read the tagged OK response
                             mail.readline()
                             process_new_emails(mail, processed_ids)
+                            # Reset failure counter on successful processing
+                            consecutive_failures = 0
                             break
                         elif b'OK' in response and tag.encode() in response:
                             # IDLE completed normally
@@ -481,39 +508,33 @@ def watch_inbox() -> None:
                             logger.info("Server sent BYE, reconnecting...")
                             raise ConnectionResetError("Server closed connection")
 
-                except TimeoutError:
-                    # Timeout - exit IDLE and poll for emails
-                    # This is critical because IDLE notifications can silently fail
-                    logger.info("Polling for new emails (IDLE fallback)...")
-                    mail.send(b'DONE\r\n')
-                    try:
-                        mail.readline()  # Read OK response
-                    except Exception:
-                        pass
+                except (socket.timeout, TimeoutError, OSError) as e:
+                    # Socket timeout or error - DON'T try to reuse this connection
+                    # The socket may be in an inconsistent state
+                    logger.info(f"IDLE timeout/socket error ({type(e).__name__}), reconnecting with fresh connection...")
+                    # Break out to reconnect with a fresh socket
+                    # Do NOT try to send DONE or poll - the socket may be dead
+                    break
 
-                    # Poll for unread emails - this is our reliability fallback
-                    # IDLE notifications can silently stop working with Gmail
-                    try:
-                        process_new_emails(mail, processed_ids)
-                    except Exception as e:
-                        logger.warning(f"Polling failed: {e}, reconnecting...")
-                        break
+                idle_timeout += 1
 
-                    idle_timeout += 1
-
-                    if idle_timeout >= 6:  # ~30 minutes
-                        # Reconnect to ensure fresh connection
-                        logger.info("Periodic reconnection to mail server...")
-                        break
+                if idle_timeout >= 3:  # ~30 minutes with 10-min timeout
+                    # Reconnect to ensure fresh connection
+                    logger.info("Periodic reconnection to mail server...")
+                    break
 
         except imaplib.IMAP4.abort as e:
             logger.warning(f"IMAP connection aborted: {e}")
+            consecutive_failures += 1
         except imaplib.IMAP4.error as e:
             logger.error(f"IMAP error: {e}")
+            consecutive_failures += 1
         except ConnectionResetError as e:
             logger.warning(f"Connection reset: {e}")
+            consecutive_failures += 1
         except Exception as e:
             logger.error(f"Unexpected error: {e}", exc_info=True)
+            consecutive_failures += 1
         finally:
             if mail:
                 try:
@@ -522,8 +543,16 @@ def watch_inbox() -> None:
                 except Exception:
                     pass
 
+        # Check for reconnect loop (service stuck in broken state)
+        if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+            logger.critical(
+                f"CRITICAL: {consecutive_failures} consecutive connection failures! "
+                f"Service appears stuck. Exiting to allow systemd restart limits to trigger."
+            )
+            sys.exit(1)
+
         # Reconnect after delay
-        logger.info("Reconnecting in 30 seconds...")
+        logger.info(f"Reconnecting in 30 seconds... (failures: {consecutive_failures}/{MAX_CONSECUTIVE_FAILURES})")
         time.sleep(30)
 
 
