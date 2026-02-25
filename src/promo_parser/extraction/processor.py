@@ -85,7 +85,7 @@ def process_pdf(
     pdf_path: str,
     client: Anthropic,
     system_prompt: str,
-    model: str = "claude-opus-4-5-20251101",
+    model: str = "claude-sonnet-4-6",
     max_tokens: int = 32768  # Opus 4.5 supports up to 64k output tokens
 ) -> Dict[str, Any]:
     """
@@ -98,7 +98,7 @@ def process_pdf(
         pdf_path: Path to the PDF file
         client: Anthropic API client
         system_prompt: The system prompt defining extraction rules
-        model: Claude model to use (default: claude-opus-4-5-20251101)
+        model: Claude model to use (default: claude-sonnet-4-6)
         max_tokens: Maximum response tokens (default: 32768, Opus 4.5 max is 64k)
         
     Returns:
@@ -150,7 +150,7 @@ def process_pdf_batch(
     pdf_paths: List[str],
     client: Anthropic,
     system_prompt: str,
-    model: str = "claude-opus-4-5-20251101",
+    model: str = "claude-sonnet-4-6",
     max_tokens: int = 32768  # Opus 4.5 supports up to 64k output tokens
 ) -> List[Dict[str, Any]]:
     """
@@ -236,7 +236,7 @@ def process_directory(
     system_prompt: str,
     output_mode: str = "both",
     output_dir: Optional[str] = None,
-    model: str = "claude-opus-4-5-20251101",
+    model: str = "claude-sonnet-4-6",
     max_tokens: int = 32768  # Opus 4.5 supports up to 64k output tokens
 ) -> List[Dict[str, Any]]:
     """
@@ -305,7 +305,7 @@ def process_directory(
 def process_product_sellsheet(
     pdf_path: str,
     client: Anthropic,
-    model: str = "claude-opus-4-5-20251101"
+    model: str = "claude-sonnet-4-6"
 ) -> Dict[str, Any]:
     """
     Process a product sell sheet PDF using the standard extraction prompt.
@@ -327,7 +327,7 @@ def process_product_sellsheet(
 def process_presentation_pdf(
     pdf_path: str,
     client: Anthropic,
-    model: str = "claude-opus-4-5-20251101"
+    model: str = "claude-sonnet-4-6"
 ) -> Dict[str, Any]:
     """
     Process an ESP presentation PDF to extract product list.

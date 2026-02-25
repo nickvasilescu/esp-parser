@@ -64,9 +64,10 @@ else:
 ESP_PREFIX = "https://portal.mypromooffice.com/presentations/"
 SAGE_PREFIX = "https://www.viewpresentation.com/"
 
-# Directory for tracking processed emails
+# Directory for tracking processed emails and URLs
 SCRIPT_DIR = Path(__file__).parent.absolute()
 PROCESSED_FILE = SCRIPT_DIR / "processed_emails.txt"
+PROCESSED_URLS_FILE = SCRIPT_DIR / "processed_urls.txt"
 
 # Health monitoring - detect reconnect loops
 MAX_CONSECUTIVE_FAILURES = 10  # Exit after this many consecutive failures
@@ -330,11 +331,26 @@ def mark_email_processed(email_id: str) -> None:
         f.write(f"{email_id}\n")
 
 
+def load_processed_urls() -> set:
+    """Load set of already processed presentation URLs."""
+    try:
+        with open(PROCESSED_URLS_FILE, 'r') as f:
+            return set(line.strip() for line in f if line.strip())
+    except FileNotFoundError:
+        return set()
+
+
+def mark_url_processed(url: str) -> None:
+    """Mark a presentation URL as processed."""
+    with open(PROCESSED_URLS_FILE, 'a') as f:
+        f.write(f"{url}\n")
+
+
 # ============================================================================
 # IMAP IDLE IMPLEMENTATION
 # ============================================================================
 
-def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
+def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set, processed_urls: set) -> None:
     """Check for and process new emails."""
     # Search for unread emails
     status, messages = mail.search(None, 'UNSEEN')
@@ -402,6 +418,13 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
         if platform and url:
             logger.info(f"  Found {platform} URL: {url}")
 
+            # Check if this URL has already been processed (dedup replies with quoted URLs)
+            if url in processed_urls:
+                logger.info(f"  URL already processed, skipping: {url}")
+                mark_email_processed(email_id_str)
+                processed_ids.add(email_id_str)
+                continue
+
             # Extract client email from To: header (excluding our watch email)
             to_emails = extract_all_emails(to_header)
             client_emails = [e for e in to_emails if WATCH_EMAIL.lower() not in e.lower()]
@@ -427,6 +450,8 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
             if trigger_workflow(platform, url, client_email=client_email, email_context=email_context):
                 mark_email_processed(email_id_str)
                 processed_ids.add(email_id_str)
+                mark_url_processed(url)
+                processed_urls.add(url)
                 logger.info(f"  Workflow triggered successfully")
             else:
                 logger.error(f"  Failed to trigger workflow")
@@ -440,7 +465,9 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set) -> None:
 def watch_inbox() -> None:
     """Main loop using IMAP IDLE."""
     processed_ids = load_processed_emails()
+    processed_urls = load_processed_urls()
     logger.info(f"Loaded {len(processed_ids)} previously processed email IDs")
+    logger.info(f"Loaded {len(processed_urls)} previously processed URLs")
 
     # Track consecutive failures to detect reconnect loops
     consecutive_failures = 0
@@ -458,7 +485,7 @@ def watch_inbox() -> None:
             consecutive_failures = 0
 
             # Process any existing unread emails first
-            process_new_emails(mail, processed_ids)
+            process_new_emails(mail, processed_ids, processed_urls)
 
             # Enter IDLE mode loop
             idle_timeout = 0
@@ -496,7 +523,7 @@ def watch_inbox() -> None:
                             mail.send(b'DONE\r\n')
                             # Read the tagged OK response
                             mail.readline()
-                            process_new_emails(mail, processed_ids)
+                            process_new_emails(mail, processed_ids, processed_urls)
                             # Reset failure counter on successful processing
                             consecutive_failures = 0
                             break

@@ -174,7 +174,7 @@ CUSTOM_FIELD_PATTERNS: Dict[str, List[str]] = {
 # =============================================================================
 
 # Claude model for the Zoho agent
-ZOHO_AGENT_MODEL: str = os.getenv("ZOHO_AGENT_MODEL", "claude-opus-4-5-20251101")
+ZOHO_AGENT_MODEL: str = os.getenv("ZOHO_AGENT_MODEL", "claude-sonnet-4-6")
 
 # Extended thinking configuration
 ZOHO_AGENT_THINKING_BUDGET: int = int(os.getenv("ZOHO_AGENT_THINKING_BUDGET", "10000"))

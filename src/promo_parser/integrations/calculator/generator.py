@@ -175,7 +175,7 @@ class CalculatorGeneratorAgent:
         self,
         zoho_client=None,
         anthropic_client=None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = "claude-sonnet-4-6",
         max_tokens: int = 4096,
         max_iterations: int = 10,
         state_manager: Optional["JobStateManager"] = None

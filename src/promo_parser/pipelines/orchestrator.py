@@ -1025,28 +1025,38 @@ class Orchestrator:
             validate_config()
 
         # Route to appropriate pipeline
-        if self.presentation_type == PresentationType.SAGE:
-            result = run_sage_pipeline(
-                url=self.url,
-                dry_run=self.dry_run,
-                state_manager=self.state_manager
+        try:
+            if self.presentation_type == PresentationType.SAGE:
+                result = run_sage_pipeline(
+                    url=self.url,
+                    dry_run=self.dry_run,
+                    state_manager=self.state_manager
+                )
+            elif self.presentation_type == PresentationType.ESP:
+                result = run_esp_pipeline(
+                    url=self.url,
+                    job_id=self.job_id,
+                    computer_id=self.computer_id,
+                    dry_run=self.dry_run,
+                    skip_cua=self.skip_cua,
+                    limit_products=self.limit_products,
+                    state_manager=self.state_manager
+                )
+            else:
+                logger.error(f"Unknown presentation type for URL: {self.url}")
+                result = {
+                    "success": False,
+                    "error": f"Unknown presentation URL type. Supported domains: {SAGE_PRESENTATION_DOMAIN}, portal.mypromooffice.com"
+                }
+        except Exception as e:
+            logger.error(f"Pipeline crashed: {e}", exc_info=True)
+            self.state_manager.complete(WorkflowStatus.ERROR.value)
+            self.state_manager.emit_thought(
+                agent="orchestrator",
+                event_type="error",
+                content=f"Pipeline crashed: {str(e)[:200]}",
             )
-        elif self.presentation_type == PresentationType.ESP:
-            result = run_esp_pipeline(
-                url=self.url,
-                job_id=self.job_id,
-                computer_id=self.computer_id,
-                dry_run=self.dry_run,
-                skip_cua=self.skip_cua,
-                limit_products=self.limit_products,
-                state_manager=self.state_manager
-            )
-        else:
-            logger.error(f"Unknown presentation type for URL: {self.url}")
-            result = {
-                "success": False,
-                "error": f"Unknown presentation URL type. Supported domains: {SAGE_PRESENTATION_DOMAIN}, portal.mypromooffice.com"
-            }
+            raise
         
         # Normalize output to unified schema
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1570,19 +1580,25 @@ Environment Variables:
     
     try:
         result = orchestrator.run()
-        
+
         if args.output_json:
             print(json.dumps(result, indent=2, ensure_ascii=False))
-        
+
         # Exit with appropriate code
         if result.get("success") is False or result.get("error"):
             sys.exit(1)
-        
+
     except KeyboardInterrupt:
         logger.warning("Orchestration interrupted by user")
+        orchestrator.state_manager.complete(WorkflowStatus.ERROR.value)
         sys.exit(130)
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
+        # Ensure job state is marked as failed even on unhandled crashes
+        try:
+            orchestrator.state_manager.complete(WorkflowStatus.ERROR.value)
+        except Exception:
+            pass
         sys.exit(1)
 
 

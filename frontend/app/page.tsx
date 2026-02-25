@@ -7,6 +7,7 @@ import VMPanel from "../components/VMPanel";
 import JobsTable from "../components/JobsTable";
 import JobDetailView from "../components/JobDetailView";
 import AgentThoughts from "../components/AgentThoughts";
+import ManualTrigger from "../components/ManualTrigger";
 import { useActiveJob } from "../hooks/useActiveJob";
 import { FileText, Timer, Package, CheckCircle, Loader2 } from "lucide-react";
 
@@ -85,6 +86,9 @@ export default function Home() {
 
   return (
     <Layout>
+      {/* Manual Workflow Trigger */}
+      <ManualTrigger />
+
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <SummaryCard
@@ -114,7 +118,7 @@ export default function Home() {
       </div>
 
       {/* Main Content: VM Panel + Active Workflows side by side */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4 xl:grid-rows-[1fr]">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4 xl:grid-rows-[1fr] xl:max-h-[480px]">
         {/* VM Panel - Left/Top */}
         <VMPanel className="h-full" />
 
