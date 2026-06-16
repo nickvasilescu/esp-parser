@@ -264,3 +264,8 @@ email_context_*.json
 *.archived.*
 **/*.archived.*
 # === end Orgo safety hardening ===
+
+# hygiene
+.DS_Store
+**/.DS_Store
+backups/
