@@ -119,7 +119,7 @@ def build_single_product_prompt(
     # Phase 2 varies based on whether this is the first product
     if is_first_product:
         login_phase = f"""PHASE 2: LOGIN TO ESP PLUS
-1. Open Firefox browser (click on Firefox icon in taskbar)
+1. Open Google Chrome browser (click on Google Chrome icon in taskbar)
 2. Navigate to: {ESP_PLUS_URL}
 3. Login using the credentials provided above:
    - Enter email: {ESP_PLUS_EMAIL}
@@ -129,10 +129,10 @@ def build_single_product_prompt(
     else:
         login_phase = f"""PHASE 2: CHECK ESP PLUS SESSION
 1. Take a screenshot to see current state
-2. If Firefox is already open with ESP Plus logged in:
+2. If Google Chrome is already open with ESP Plus logged in:
    - Proceed directly to Phase 3
-3. If Firefox is closed or not logged in:
-   - Open Firefox browser
+3. If Google Chrome is closed or not logged in:
+   - Open Google Chrome browser
    - Navigate to: {ESP_PLUS_URL}
    - Login with email: {ESP_PLUS_EMAIL} and password: {ESP_PLUS_PASSWORD}
 4. Ensure you're on the ESP Plus search page before continuing"""
@@ -151,7 +151,7 @@ def build_single_product_prompt(
 
 IMPORTANT CONTEXT:
 - You are controlling a Linux desktop environment
-- Firefox browser is available
+- Google Chrome browser is available
 - You have Terminal access for file operations
 - Job ID: {job_id}
 - Working directory: {working_dir}
@@ -185,7 +185,7 @@ PHASE 3: SEARCH ON ESP+ WEBSITE AND PRINT NEW PDF
 ⚠️ You MUST be on {ESP_PLUS_URL} website at this point, NOT looking at existing files!
 
 1. SEARCH for the product ON THE ESP+ WEBSITE:
-   - Make sure you are in Firefox on the ESP Plus website ({ESP_PLUS_URL})
+   - Make sure you are in Google Chrome on the ESP Plus website ({ESP_PLUS_URL})
    - Find the search box on the ESP Plus website
    - Clear any existing search text
    - Enter the CPN: {cpn}
