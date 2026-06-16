@@ -261,4 +261,6 @@ node_modules/
 venv/
 **/venv/
 email_context_*.json
+*.archived.*
+**/*.archived.*
 # === end Orgo safety hardening ===

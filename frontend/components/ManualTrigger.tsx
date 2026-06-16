@@ -10,6 +10,7 @@ type Status = "idle" | "loading" | "success" | "error";
 
 export default function ManualTrigger() {
   const [url, setUrl] = useState("");
+  const [customer, setCustomer] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
 
@@ -37,7 +38,7 @@ export default function ManualTrigger() {
       const res = await fetch("/api/workflows/trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: trimmed }),
+        body: JSON.stringify({ url: trimmed, customer: customer.trim() }),
       });
 
       const data = await res.json();
@@ -46,6 +47,7 @@ export default function ManualTrigger() {
         setStatus("success");
         setMessage(`${data.platform} workflow started`);
         setUrl("");
+        setCustomer("");
         // Reset after a few seconds
         setTimeout(() => {
           setStatus("idle");
@@ -103,6 +105,20 @@ export default function ManualTrigger() {
           )}
           Run Workflow
         </button>
+      </div>
+      <div className="mt-2">
+        <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+          Customer (account #, name, or email)
+        </label>
+        <input
+          type="text"
+          value={customer}
+          onChange={(e) => setCustomer(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Customer (account #, name, or email) - optional"
+          className="w-full bg-secondary text-foreground text-sm rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+          disabled={status === "loading"}
+        />
       </div>
       {message && (
         <div
