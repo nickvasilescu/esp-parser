@@ -531,7 +531,7 @@ Product summary:
             setup_cell.number_format = '$#,##0.00'
 
             # Column F: Total formula (Price * Qty + Setup)
-            total_cell = ws.cell(row=row_idx, column=6, value=f"=D{row_idx}*C{row_idx}+E{row_idx}")
+            total_cell = ws.cell(row=row_idx, column=6, value=f"=D{row_idx}*C{row_idx}+IF(C{row_idx}>0,E{row_idx},0)")
             total_cell.border = thin_border
             total_cell.number_format = '$#,##0.00'
 
