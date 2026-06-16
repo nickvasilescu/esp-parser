@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "promo_parser"
+version = "1.0.0"
+description = "ESP/SAGE promotional product presentation parser with Zoho integration"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Nick Vasilescu"}
+]
+keywords = ["promotional", "products", "ESP", "SAGE", "PDF", "parser", "Zoho"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+]
+
+dependencies = [
+    # Core
+    "anthropic>=0.40.0",
+    "python-dotenv>=1.0.0",
+
+    # Orgo CUA
+    "orgo>=0.0.30",
+
+    # Browser Automation
+    "selenium>=4.0.0",
+    "seleniumbase>=4.0.0",
+    "websocket-client>=1.6.0",
+    "websockets>=12.0",
+
+    # HTTP/Networking
+    "requests>=2.31.0",
+    "boto3>=1.34.0",
+    "certifi>=2024.0.0",
+
+    # HTML/XML Parsing
+    "beautifulsoup4>=4.12.0",
+
+    # Excel Generation
+    "openpyxl>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-html>=4.0.0",
+    "pytest-xdist>=3.5.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+]
+
+[project.scripts]
+promo-parser = "promo_parser.pipelines.orchestrator:main"
+esp-parser = "promo_parser.pipelines.esp.parser:main"
+
+[project.urls]
+Homepage = "https://github.com/koellmarketing/promo_parser"
+Repository = "https://github.com/koellmarketing/promo_parser.git"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_ignores = true

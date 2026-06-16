@@ -1,0 +1,24 @@
+[Unit]
+Description=Email Trigger Watcher for Promo Pipeline
+Documentation=https://github.com/your-repo
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/promo-pipeline
+EnvironmentFile=/opt/promo-pipeline/.env
+ExecStart=/opt/promo-pipeline/venv/bin/python /opt/promo-pipeline/email_trigger/email_watcher.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/promo-pipeline /var/log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,79 @@
+# Core ESP Parser
+anthropic
+python-dotenv
+
+# Orgo CUA
+orgo
+
+# Selenium/Browser Automation
+selenium
+seleniumbase
+mycdp
+# sbvirtualdisplay  # Disabled due to Python 3.13+ compatibility issues
+websocket-client
+websockets
+wsproto
+trio
+trio-websocket
+
+# AWS S3
+boto3
+
+# HTTP/Networking
+requests
+urllib3
+certifi
+charset-normalizer
+idna
+h11
+PySocks
+
+# HTML/XML Parsing
+beautifulsoup4
+soupsieve
+cssselect
+
+# Testing
+pytest
+pytest-html
+pytest-metadata
+pytest-ordering
+pytest-rerunfailures
+pytest-xdist
+behave
+parameterized
+pynose
+
+# Utilities
+attrs
+chardet
+colorama
+exceptiongroup
+execnet
+fasteners
+filelock
+iniconfig
+Jinja2
+markdown-it-py
+MarkupSafe
+mdurl
+outcome
+packaging
+parse
+parse_type
+pdbp
+platformdirs
+pluggy
+Pygments
+pyotp
+PyYAML
+rich
+six
+sniffio
+sortedcontainers
+tabcompleter
+typing_extensions
+
+# Build
+setuptools
+wheel
