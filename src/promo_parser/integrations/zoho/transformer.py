@@ -1503,10 +1503,18 @@ def build_product_tier_line_items(
 
     # Sort breaks by quantity ascending and keep only usable tiers
     sorted_breaks = sorted(breaks, key=lambda b: b.get("quantity", 0))
-    valid_breaks = [
-        b for b in sorted_breaks
-        if b.get("sell_price") is not None and b.get("quantity", 0) > 0
-    ]
+    def _as_float(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    valid_breaks = []
+    for b in sorted_breaks:
+        sp = _as_float(b.get("sell_price"))
+        q = b.get("quantity", 0)
+        if sp is not None and isinstance(q, (int, float)) and q > 0:
+            valid_breaks.append((q, sp))
 
     if not valid_breaks:
         logger.info(f"No usable pricing tiers for {product_name}")
@@ -1515,12 +1523,8 @@ def build_product_tier_line_items(
     # Emit ONE product line at the lowest-quantity tier (the default order qty) and
     # preserve every price break in the description. Previously each tier was a separate
     # billable line that summed into a nonsensical total Koell had to prune by hand.
-    primary = valid_breaks[0]
-    qty = primary.get("quantity", 0)
-    sell_price = primary.get("sell_price")
-    breaks_summary = "; ".join(
-        f"{b.get('quantity')}+ @ ${b.get('sell_price'):.2f}" for b in valid_breaks
-    )
+    qty, sell_price = valid_breaks[0]
+    breaks_summary = "; ".join(f"{q}+ @ ${sp:.2f}" for q, sp in valid_breaks)
 
     line_items.append(build_estimate_line_item(
         name=f"{product_name} ({base_code})",
@@ -1818,7 +1822,8 @@ def build_estimate_payload(
         # SKU format: <client_num>-<base_code>
         item_id = None
         for sku, iid in item_master_map.items():
-            if base_code in sku:
+            # Match the base product item only; never a "+setup"/"+pms"/... fee SKU.
+            if base_code in sku and "+" not in sku:
                 item_id = iid
                 logger.debug(f"Found Item Master link: {sku} -> {iid}")
                 break
