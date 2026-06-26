@@ -1620,7 +1620,7 @@ def build_decoration_line_items(
                 description=get_fee_description(fee),
                 rate=rate,
                 quantity=1,
-                item_id=item_ids.get(fee_type) if item_ids else None,
+                item_id=(item_ids or {}).get(fee_type.replace("_", "")) or (item_ids or {}).get(fee_type),
                 unit="ea"
             ))
 
@@ -1641,6 +1641,7 @@ def build_decoration_line_items(
                     description=get_fee_description(fee),
                     rate=rate,
                     quantity=1,
+                    item_id=(item_ids or {}).get(fee_type.replace("_", "")) or (item_ids or {}).get(fee_type),
                     unit="ea"
                 ))
 
@@ -1663,15 +1664,10 @@ def build_decoration_line_items(
             for li in line_items
         )
 
+        # $0 "Decoration Option" placeholder lines suppressed: they were clutter
+        # Koell deleted by hand. Methods with a real price are captured as fee lines above.
         if not method_exists:
-            # Add as option line (price TBD or $0 placeholder)
-            line_items.append(build_estimate_line_item(
-                name=f"Decoration Option: {method_name}",
-                description=method_notes or f"{method_name} decoration method - price TBD",
-                rate=0.00,  # Price TBD - user fills in
-                quantity=1,
-                unit="ea"
-            ))
+            pass
 
     logger.info(f"Built {len(line_items)} decoration line items (fan-out approach)")
     return line_items
@@ -1842,7 +1838,13 @@ def build_estimate_payload(
             all_line_items.append(setup_line)
 
         # 3. Decoration options (fan-out approach)
-        deco_lines = build_decoration_line_items(product)
+        # Build fee_type -> item_id map from Item Master so decoration/fee lines
+        # link to real catalog items instead of becoming SKU-less memo lines.
+        fee_item_ids = {}
+        for _sku, _iid in item_master_map.items():
+            if "+" in _sku:
+                fee_item_ids[_sku.split("+", 1)[1].lower()] = _iid
+        deco_lines = build_decoration_line_items(product, fee_item_ids)
         all_line_items.extend(deco_lines)
 
         # 4. Check for explicit quoted shipping
