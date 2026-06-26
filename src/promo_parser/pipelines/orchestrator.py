@@ -590,6 +590,30 @@ def merge_presentation_and_product_data(
 # SAGE Pipeline
 # =============================================================================
 
+def _alert(message: str) -> None:
+    """Minimum failure alert so a hard failure can never be silent again:
+    prominent ERROR log + append to logs/ALERTS.log. (Push channel = recommended follow-up.)"""
+    import os as _os
+    from datetime import datetime as _dt
+    logging.getLogger(__name__).error("ALERT: %s", message)
+    try:
+        p = "/opt/promo-pipeline/logs/ALERTS.log"
+        _os.makedirs(_os.path.dirname(p), exist_ok=True)
+        with open(p, "a") as fh:
+            fh.write("%sZ\t%s\n" % (_dt.utcnow().isoformat(), message))
+    except Exception:
+        pass
+
+
+def _upload_produced_items(zoho_result) -> bool:
+    """True only if the Item Master upload created >=1 real catalog item."""
+    return bool(
+        zoho_result is not None
+        and getattr(zoho_result, "success", False)
+        and getattr(zoho_result, "successful_uploads", 0) > 0
+    )
+
+
 def run_sage_pipeline(
     url: str,
     dry_run: bool = False,
@@ -1458,6 +1482,13 @@ class Orchestrator:
             logger.info("=" * 60)
             logger.info("ZOHO ITEM MASTER UPLOAD")
             logger.info("=" * 60)
+
+            # Preflight: confirm the Anthropic key has credit/auth BEFORE the agentic
+            # item-master upload. A dead key here is the root cause of SKU-less memo quotes.
+            from promo_parser.core.config import anthropic_healthcheck
+            _pf_ok, _pf_msg = anthropic_healthcheck()
+            if not _pf_ok:
+                _alert("Anthropic preflight FAILED before Item Master upload: %s" % _pf_msg)
             
             if not ZOHO_AVAILABLE:
                 logger.error("Zoho integration not available. Install zoho_item_agent module.")
@@ -1537,6 +1568,26 @@ class Orchestrator:
                         "success": False,
                         "error": str(e)
                     }
+
+        # Guardrail: never build a customer-facing quote when Item Master upload
+        # created zero catalog items. An empty Item-Master map yields SKU-less "memo"
+        # line items (the exact failure Koell reported). Block + alert + count as error.
+        if self.zoho_upload and not downstream_blocked and not _upload_produced_items(zoho_result):
+            cause = (normalized_result.get("zoho_upload_result") or {}).get("error") \
+                or "Item Master upload created 0 items"
+            reason = "Quote/calculator blocked: Item Master upload created no catalog items (%s)" % cause
+            _alert(reason)
+            downstream_blocked = True
+            normalized_result["success"] = False
+            normalized_result["downstream_blocked"] = True
+            normalized_result["downstream_blocked_reason"] = reason
+            normalized_result.setdefault("errors", []).append({"step": "zoho_item_master", "message": reason})
+            if self.zoho_quote:
+                normalized_result["zoho_quote_result"] = {"success": False, "skipped": True, "error": reason}
+            if self.calculator:
+                normalized_result["calculator_result"] = {"success": False, "skipped": True, "products_count": 0, "error": reason}
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(normalized_result, f, indent=2, ensure_ascii=False)
 
         # =========================================================================
         # Optional: Zoho Quote Creation
@@ -1663,6 +1714,8 @@ class Orchestrator:
                         "success": False,
                         "error": str(e)
                     }
+                    normalized_result.setdefault("errors", []).append({"step": "zoho_quote", "message": str(e)})
+                    _alert("Zoho quote creation failed: %s" % e)
 
         # =========================================================================
         # Optional: Calculator Generation
@@ -1730,6 +1783,8 @@ class Orchestrator:
                         "success": False,
                         "error": str(e)
                     }
+                    normalized_result.setdefault("errors", []).append({"step": "calculator", "message": str(e)})
+                    _alert("Calculator generation failed: %s" % e)
 
         # Emit final state: completed
         has_errors = len(normalized_result.get('errors', [])) > 0
