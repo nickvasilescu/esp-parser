@@ -591,8 +591,9 @@ def merge_presentation_and_product_data(
 # =============================================================================
 
 def _alert(message: str) -> None:
-    """Minimum failure alert so a hard failure can never be silent again:
-    prominent ERROR log + append to logs/ALERTS.log. (Push channel = recommended follow-up.)"""
+    """Failure alert so a hard failure can never be silent again: prominent ERROR log,
+    append to logs/ALERTS.log, plus a best-effort push email to the pipeline OWNER
+    (AgentMail -> ALERT_EMAIL, never the client). Push fires at most once per process."""
     import os as _os
     from datetime import datetime as _dt
     logging.getLogger(__name__).error("ALERT: %s", message)
@@ -603,7 +604,27 @@ def _alert(message: str) -> None:
             fh.write("%sZ\t%s\n" % (_dt.utcnow().isoformat(), message))
     except Exception:
         pass
+    global _ALERT_PUSHED
+    try:
+        if _os.getenv("ALERT_PUSH_DISABLED") == "1" or _ALERT_PUSHED:
+            return
+        key = _os.getenv("AGENTMAIL_API_KEY")
+        inbox = _os.getenv("AGENTMAIL_INBOX_ID") or "alex_stbl@agentmail.to"
+        to = _os.getenv("ALERT_EMAIL") or "nick@orgo.ai"
+        if key:
+            import requests
+            requests.post(
+                "https://api.agentmail.to/v0/inboxes/%s/messages/send" % inbox,
+                headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
+                json={"to": [to], "subject": "[promo-pipeline ALERT] pipeline failure", "text": message},
+                timeout=15,
+            )
+            _ALERT_PUSHED = True
+    except Exception:
+        pass
 
+
+_ALERT_PUSHED = False
 
 def _upload_produced_items(zoho_result) -> bool:
     """True only if the Item Master upload created >=1 real catalog item."""
