@@ -1501,31 +1501,40 @@ def build_product_tier_line_items(
 
     line_items = []
 
-    # Sort breaks by quantity ascending
+    # Sort breaks by quantity ascending and keep only usable tiers
     sorted_breaks = sorted(breaks, key=lambda b: b.get("quantity", 0))
+    valid_breaks = [
+        b for b in sorted_breaks
+        if b.get("sell_price") is not None and b.get("quantity", 0) > 0
+    ]
 
-    for brk in sorted_breaks:
-        qty = brk.get("quantity", 0)
-        sell_price = brk.get("sell_price")  # ALWAYS from presentation
+    if not valid_breaks:
+        logger.info(f"No usable pricing tiers for {product_name}")
+        return line_items
 
-        if sell_price is None:
-            # Skip tiers without sell_price
-            logger.debug(f"Skipping tier qty={qty} - no sell_price")
-            continue
+    # Emit ONE product line at the lowest-quantity tier (the default order qty) and
+    # preserve every price break in the description. Previously each tier was a separate
+    # billable line that summed into a nonsensical total Koell had to prune by hand.
+    primary = valid_breaks[0]
+    qty = primary.get("quantity", 0)
+    sell_price = primary.get("sell_price")
+    breaks_summary = "; ".join(
+        f"{b.get('quantity')}+ @ ${b.get('sell_price'):.2f}" for b in valid_breaks
+    )
 
-        if qty <= 0:
-            continue
+    line_items.append(build_estimate_line_item(
+        name=f"{product_name} ({base_code})",
+        description=f"Qty price breaks: {breaks_summary}. Adjust quantity as needed.",
+        rate=sell_price,
+        quantity=qty,
+        item_id=item_id,
+        unit="pcs"
+    ))
 
-        line_items.append(build_estimate_line_item(
-            name=f"{product_name} ({base_code}) - Qty {qty}+",
-            description=f"Unit price at {qty}+ quantity tier",
-            rate=sell_price,
-            quantity=qty,
-            item_id=item_id,
-            unit="pcs"
-        ))
-
-    logger.info(f"Built {len(line_items)} quantity tier line items for {product_name}")
+    logger.info(
+        f"Built 1 product line for {product_name} at primary tier {qty}+ "
+        f"(${sell_price}); {len(valid_breaks)} price breaks captured in description"
+    )
     return line_items
 
 
