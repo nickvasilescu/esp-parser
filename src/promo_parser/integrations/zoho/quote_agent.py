@@ -27,7 +27,7 @@ import logging
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import Anthropic
 
@@ -55,6 +55,46 @@ except ImportError:
     WorkflowStatus = None
 
 logger = logging.getLogger(__name__)
+
+
+INTERNAL_CUSTOMER_EMAIL_DOMAINS = {
+    "stblstrategies.com",
+    "computeruse.agency",
+    "orgo.ai",
+}
+
+
+def _normalize_email(value: Any) -> str:
+    """Return a lower-cased bare email from common mailbox formats."""
+    if not value:
+        return ""
+    text = str(value).strip()
+    if "<" in text and ">" in text:
+        text = text.split("<", 1)[1].split(">", 1)[0]
+    return text.strip().lower()
+
+
+def _is_internal_customer_email(email: str) -> bool:
+    email = _normalize_email(email)
+    if "@" not in email:
+        return False
+    domain = email.rsplit("@", 1)[1]
+    return domain in INTERNAL_CUSTOMER_EMAIL_DOMAINS or domain.endswith(".stblstrategies.com")
+
+
+def _contact_has_email(contact: Dict[str, Any], email: str) -> bool:
+    wanted = _normalize_email(email)
+    if not wanted:
+        return False
+    values = [
+        contact.get("email"),
+        contact.get("contact_email"),
+        contact.get("primary_email"),
+    ]
+    for person in contact.get("contact_persons", []) or []:
+        if isinstance(person, dict):
+            values.extend([person.get("email"), person.get("email_id")])
+    return any(_normalize_email(v) == wanted for v in values if v)
 
 
 # =============================================================================
@@ -452,16 +492,56 @@ class ZohoQuoteAgent:
 
             # Create in Zoho
             estimate = self.zoho_client.create_estimate(estimate_payload)
+            expected_line_items = len(estimate_payload.get("line_items", []))
+            estimate_id = estimate.get("estimate_id")
+            persisted_line_items = None
+
+            # Read-after-write validation: Koell's recurring complaint was that
+            # Alex reported success while Zoho appeared to contain fewer/missing
+            # items. Do not call the workflow successful until Zoho's persisted
+            # quote detail has the same number of line items we sent.
+            if estimate_id:
+                persisted_estimate = self.zoho_client.get_estimate(estimate_id)
+                persisted_line_items = len(persisted_estimate.get("line_items", []) or [])
+                if persisted_line_items != expected_line_items:
+                    error_msg = (
+                        f"Zoho persisted {persisted_line_items} line items, "
+                        f"but Alex sent {expected_line_items}. Estimate: {estimate.get('estimate_number')}"
+                    )
+                    logger.error(error_msg)
+                    self._quote_result = QuoteResult(
+                        success=False,
+                        estimate_id=estimate_id,
+                        estimate_number=estimate.get("estimate_number"),
+                        customer_id=customer_id,
+                        customer_name=estimate.get("customer_name"),
+                        total_amount=estimate.get("total"),
+                        line_items_count=persisted_line_items,
+                        error=error_msg
+                    )
+                    return json.dumps({
+                        "success": False,
+                        "estimate_id": estimate_id,
+                        "estimate_number": estimate.get("estimate_number"),
+                        "expected_line_items_count": expected_line_items,
+                        "persisted_line_items_count": persisted_line_items,
+                        "error": error_msg,
+                        "message": "Zoho quote validation failed after creation"
+                    })
+                logger.info(
+                    "Zoho quote validation passed: %s persisted line items",
+                    persisted_line_items
+                )
 
             # Store result
             self._quote_result = QuoteResult(
                 success=True,
-                estimate_id=estimate.get("estimate_id"),
+                estimate_id=estimate_id,
                 estimate_number=estimate.get("estimate_number"),
                 customer_id=customer_id,
                 customer_name=estimate.get("customer_name"),
                 total_amount=estimate.get("total"),
-                line_items_count=len(estimate_payload.get("line_items", []))
+                line_items_count=expected_line_items
             )
 
             # Emit success thought
@@ -479,7 +559,8 @@ class ZohoQuoteAgent:
                 "estimate_number": estimate.get("estimate_number"),
                 "customer_name": estimate.get("customer_name"),
                 "total": estimate.get("total"),
-                "line_items_count": len(estimate_payload.get("line_items", [])),
+                "line_items_count": expected_line_items,
+                "persisted_line_items_count": persisted_line_items,
                 "status": "draft",
                 "expiry_date": estimate.get("expiry_date"),
                 "message": f"Draft quote created: {estimate.get('estimate_number')}"
@@ -509,6 +590,94 @@ class ZohoQuoteAgent:
             "summary": summary,
             "estimate_number": estimate_number
         })
+
+    def _resolve_customer_deterministically(
+        self,
+        unified_output: Dict[str, Any]
+    ) -> Tuple[Optional[Dict[str, Any]], str]:
+        """Resolve the Zoho customer without LLM tool-loop ambiguity."""
+        client = unified_output.get("client", {}) or {}
+
+        email = _normalize_email(client.get("email"))
+        if email and not _is_internal_customer_email(email):
+            contacts = self.zoho_client.search_contacts(email=email)
+            customers = [c for c in contacts if c.get("contact_type") == "customer"]
+            exact = [c for c in customers if _contact_has_email(c, email)]
+            candidates = exact or customers
+            if candidates:
+                customer = candidates[0]
+                logger.info(
+                    "Resolved Zoho customer by external email domain %s: %s",
+                    email.rsplit("@", 1)[1] if "@" in email else "unknown",
+                    customer.get("contact_name") or customer.get("company_name")
+                )
+                return customer, "external_email"
+            logger.warning("No Zoho customer matched external customer email domain %s", email.rsplit("@", 1)[1] if "@" in email else "unknown")
+        elif email:
+            logger.warning("Ignoring internal/STBL email for customer resolution: %s", email)
+
+        account_number = client.get("account_number") or client.get("contact_number") or client.get("id")
+        if account_number:
+            customer = self.zoho_client.find_customer_by_account_number(str(account_number))
+            if customer and customer.get("contact_type") == "customer":
+                logger.info("Resolved Zoho customer by account number: %s", customer.get("contact_number"))
+                return customer, "account_number"
+
+        generic_terms = {"", "client", "customer", "unknown", "n/a", "none"}
+        company = str(client.get("company") or "").strip()
+        name = str(client.get("name") or "").strip()
+        company_for_search = company if company.lower() not in generic_terms else None
+        name_for_search = name if name.lower() not in generic_terms else None
+
+        if company_for_search or name_for_search:
+            contacts = self.zoho_client.search_contacts(
+                name=name_for_search,
+                company_name=company_for_search
+            )
+            customers = [c for c in contacts if c.get("contact_type") == "customer"]
+            if customers:
+                customer = customers[0]
+                logger.info(
+                    "Resolved Zoho customer by name/company: %s",
+                    customer.get("contact_name") or customer.get("company_name")
+                )
+                return customer, "name_or_company"
+
+        return None, "not_found"
+
+    def _try_deterministic_quote_creation(
+        self,
+        unified_output: Dict[str, Any],
+        start_time: datetime
+    ) -> Optional[QuoteResult]:
+        """Create a quote via deterministic customer lookup before falling back to Claude."""
+        customer, basis = self._resolve_customer_deterministically(unified_output)
+        if not customer:
+            logger.warning("Deterministic Zoho customer resolution failed; basis=%s", basis)
+            return None
+
+        customer_id = customer.get("contact_id")
+        if not customer_id:
+            logger.warning("Resolved customer has no contact_id; falling back to Claude quote agent")
+            return None
+
+        result_json = json.loads(self._tool_create_draft_quote({"customer_id": customer_id}))
+        duration = (datetime.now() - start_time).total_seconds()
+
+        if result_json.get("success") and self._quote_result:
+            self._quote_result.duration_seconds = duration
+            logger.info("Deterministic quote creation succeeded using %s", basis)
+            return self._quote_result
+
+        error = result_json.get("error") or result_json.get("message") or "Deterministic quote creation failed"
+        logger.error("Deterministic quote creation failed: %s", error)
+        return QuoteResult(
+            success=False,
+            customer_id=customer_id,
+            customer_name=customer.get("contact_name") or customer.get("company_name"),
+            error=error,
+            duration_seconds=duration
+        )
 
     def create_quote(
         self,
@@ -553,6 +722,17 @@ class ZohoQuoteAgent:
         logger.info(f"Client: {client_info.get('name') or client_info.get('company', 'Unknown')}")
         logger.info(f"Item Master entries available: {len(self._item_master_map)}")
 
+        # Safety: refuse to create customer-facing quotes from empty extractions.
+        if not products:
+            error_msg = "No products extracted; refusing to create an empty Zoho quote."
+            logger.error(error_msg)
+            return QuoteResult(
+                success=False,
+                error=error_msg,
+                line_items_count=0,
+                duration_seconds=(datetime.now() - start_time).total_seconds()
+            )
+
         if dry_run:
             logger.info("[DRY RUN] Would create quote but not upload to Zoho")
 
@@ -568,6 +748,23 @@ class ZohoQuoteAgent:
                 line_items_count=len(estimate_payload.get("line_items", [])),
                 error="Dry run - quote not created"
             )
+
+        deterministic_result = self._try_deterministic_quote_creation(unified_output, start_time)
+        if deterministic_result is not None:
+            result = deterministic_result
+            logger.info("=" * 60)
+            logger.info("QUOTE AGENT COMPLETE")
+            logger.info("=" * 60)
+            logger.info(f"Success: {result.success}")
+            if result.estimate_number:
+                logger.info(f"Estimate Number: {result.estimate_number}")
+            if result.total_amount:
+                logger.info(f"Total Amount: ${result.total_amount:.2f}")
+            logger.info(f"Line Items: {result.line_items_count}")
+            logger.info(f"Duration: {result.duration_seconds:.2f}s")
+            if result.error:
+                logger.error(f"Error: {result.error}")
+            return result
 
         # Build initial message for Claude
         initial_message = self._build_initial_message(unified_output)

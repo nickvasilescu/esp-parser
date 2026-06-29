@@ -9,7 +9,7 @@ const SAGE_PATTERN = /^https:\/\/www\.viewpresentation\.com\/\d+$/;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { url, customer } = body;
+    const { url } = body;
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(
@@ -52,15 +52,6 @@ export async function POST(request: NextRequest) {
       "--calculator",
       "--verbose",
     ];
-
-    // Optional customer identity (account #, name, or email) for Zoho contact lookup.
-    // The orchestrator CLI accepts --client-email; an STBL account number or an
-    // email both resolve the contact, avoiding UNKNOWN- SKUs on dashboard-triggered quotes.
-    const customerValue =
-      typeof customer === "string" ? customer.trim() : "";
-    if (customerValue) {
-      args.push("--client-email", customerValue);
-    }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const logPath = path.join(projectRoot, "email_trigger", `workflow_manual_${timestamp}.log`);

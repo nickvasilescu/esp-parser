@@ -229,6 +229,17 @@ class CalculatorGeneratorAgent:
         presentation_title = metadata.get("presentation_title")
         products = unified_output.get("products", [])
 
+        # Safety: refuse to generate/upload/send empty calculators.
+        if not products:
+            error_msg = "No products extracted; refusing to generate or send an empty calculator."
+            logger.error(error_msg)
+            return CalculatorResult(
+                success=False,
+                error=error_msg,
+                products_count=0,
+                duration_seconds=time.time() - start_time
+            )
+
         # Extract client name - prefer Zoho lookup by email TO address
         client_name = None
         email_context = unified_output.get("_email_context")
@@ -513,6 +524,11 @@ Product summary:
                           self._unified_output.get("client", {}).get("name") or \
                           "Client"
             product_count = len(self._unified_output.get("products", []))
+            if product_count <= 0:
+                return json.dumps({
+                    "success": False,
+                    "error": "Refusing to send calculator email because product_count is 0"
+                })
             file_name = os.path.basename(file_path)
 
             body_html = f"""
@@ -716,7 +732,7 @@ Product summary:
             setup_cell.number_format = '$#,##0.00'
 
             # Column F: Total formula (Price * Qty + Setup)
-            total_cell = ws.cell(row=row_idx, column=6, value=f"=D{row_idx}*C{row_idx}+E{row_idx}")
+            total_cell = ws.cell(row=row_idx, column=6, value=f"=D{row_idx}*C{row_idx}+IF(C{row_idx}>0,E{row_idx},0)")
             total_cell.border = thin_border
             total_cell.number_format = '$#,##0.00'
 

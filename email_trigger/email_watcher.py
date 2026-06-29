@@ -72,6 +72,19 @@ PROCESSED_URLS_FILE = SCRIPT_DIR / "processed_urls.txt"
 # Health monitoring - detect reconnect loops
 MAX_CONSECUTIVE_FAILURES = 10  # Exit after this many consecutive failures
 
+# Search a short recent window, not only UNSEEN, so Alex does not miss a
+# Koell email just because another client/device marked it read first.
+EMAIL_SEARCH_LOOKBACK_DAYS = int(os.getenv("EMAIL_SEARCH_LOOKBACK_DAYS", "2"))
+RERUN_KEYWORDS = tuple(
+    kw.strip().lower()
+    for kw in os.getenv(
+        "RERUN_KEYWORDS",
+        "rerun,re-run,reprocess,re-process,retry,try again,not working,still not,fixed,after calculator"
+    ).split(",")
+    if kw.strip()
+)
+
+
 # Logging setup - log to file if on server, otherwise just console
 LOG_FILE = "/var/log/email-watcher.log" if os.path.exists("/var/log") else None
 handlers = [logging.StreamHandler()]
@@ -175,6 +188,39 @@ def extract_url(body: str) -> tuple:
     return (None, None)
 
 
+
+
+def strip_quoted_reply(body: str) -> str:
+    # Return only the newly-written part of a reply/forward body.
+    # Presentation URLs in quoted history caused duplicate or misleading triggers.
+    if not body:
+        return ""
+    markers = [
+        r"^On .+ wrote:\s*$",
+        r"^-{2,}\s*Original Message\s*-{2,}\s*$",
+        r"^From:\s+.+$",
+        r"^Sent:\s+.+$",
+        r"^To:\s+.+$",
+        r"^Subject:\s+.+$",
+        r"^>+\s+",
+        r"^_{5,}\s*$",
+    ]
+    pattern = re.compile("|".join(f"(?:{m})" for m in markers), re.IGNORECASE | re.MULTILINE)
+    match = pattern.search(body)
+    return body[:match.start()].strip() if match else body.strip()
+
+
+def should_rerun_processed_url(subject: str, fresh_body: str) -> bool:
+    # Allow an explicitly resent/failed URL to run again after a fix.
+    text = ((subject or "") + "\n" + (fresh_body or "")).lower()
+    return any(keyword in text for keyword in RERUN_KEYWORDS)
+
+def redact_url(url: str) -> str:
+    """Redact shared-presentation accessCode values before logging."""
+    import re
+    return re.sub(r"(?i)(accessCode=)[^&\s\]\)]+", r"\1[REDACTED]", url or "")
+
+
 def get_email_body(msg) -> str:
     """Extract plain text body from email message."""
     body = ""
@@ -233,7 +279,7 @@ def trigger_workflow(
     import json
     import tempfile
 
-    logger.info(f"Triggering {platform} workflow: {url}")
+    logger.info(f"Triggering {platform} workflow: {redact_url(url)}")
     if client_email:
         logger.info(f"  Client email: {client_email}")
 
@@ -331,6 +377,24 @@ def mark_email_processed(email_id: str) -> None:
         f.write(f"{email_id}\n")
 
 
+def extract_fetch_uid(fetch_item) -> str:
+    """Extract stable IMAP UID from a FETCH response tuple.
+
+    IMAP SEARCH returns sequence numbers, which can shift after mailbox
+    expunges. Keep legacy sequence IDs for backwards compatibility, but store
+    uid:<UID> for all newly seen messages so idempotency survives mailbox
+    churn.
+    """
+    try:
+        meta = fetch_item[0] if fetch_item else b""
+    except (IndexError, TypeError):
+        return ""
+    if isinstance(meta, bytes):
+        meta = meta.decode(errors="ignore")
+    match = re.search(r"\bUID\s+(\d+)\b", str(meta))
+    return match.group(1) if match else ""
+
+
 def load_processed_urls() -> set:
     """Load set of already processed presentation URLs."""
     try:
@@ -352,8 +416,16 @@ def mark_url_processed(url: str) -> None:
 
 def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set, processed_urls: set) -> None:
     """Check for and process new emails."""
-    # Search for unread emails
-    status, messages = mail.search(None, 'UNSEEN')
+    # Search a bounded recent window, not only UNSEEN. Zoho/client apps can mark
+    # messages read before Alex sees them; processed_ids keeps this idempotent.
+    if EMAIL_SEARCH_LOOKBACK_DAYS > 0:
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(days=EMAIL_SEARCH_LOOKBACK_DAYS)).strftime('%d-%b-%Y')
+        status, messages = mail.search(None, 'SINCE', since)
+        search_label = f"emails since {since}"
+    else:
+        status, messages = mail.search(None, 'UNSEEN')
+        search_label = "unread email(s)"
     if status != 'OK':
         return
 
@@ -362,18 +434,14 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set, processed_ur
     if not email_ids:
         return
 
-    logger.info(f"Found {len(email_ids)} unread email(s)")
+    logger.info(f"Found {len(email_ids)} {search_label}")
 
     for email_id in email_ids:
         email_id_str = email_id.decode()
 
-        # Skip if already processed
-        if email_id_str in processed_ids:
-            logger.debug(f"Skipping already processed email: {email_id_str}")
-            continue
-
-        # Fetch the email
-        status, msg_data = mail.fetch(email_id, '(RFC822)')
+        # Fetch the email plus its stable IMAP UID. Older processed_emails.txt
+        # entries are sequence numbers; new entries are uid:<UID>.
+        status, msg_data = mail.fetch(email_id, '(UID RFC822)')
         if status != 'OK':
             logger.warning(f"Failed to fetch email {email_id_str}")
             continue
@@ -382,6 +450,26 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set, processed_ur
         if not msg_data or not msg_data[0] or msg_data[0][1] is None:
             logger.warning(f"Empty fetch result for email {email_id_str}, skipping")
             continue
+
+        uid = extract_fetch_uid(msg_data[0])
+        processed_key = f"uid:{uid}" if uid else email_id_str
+
+        # Skip if already processed. Accept legacy sequence IDs, but migrate them
+        # to UID keys as we encounter them.
+        if processed_key in processed_ids or email_id_str in processed_ids:
+            if uid and processed_key not in processed_ids:
+                mark_email_processed(processed_key)
+                processed_ids.add(processed_key)
+            logger.debug(f"Skipping already processed email: {processed_key}")
+            continue
+
+        def remember_email_processed() -> None:
+            if processed_key not in processed_ids:
+                mark_email_processed(processed_key)
+                processed_ids.add(processed_key)
+            # Keep the current sequence number in memory only to avoid duplicate
+            # work during this process lifetime without writing unstable IDs.
+            processed_ids.add(email_id_str)
 
         raw_email = msg_data[0][1]
         msg = email.message_from_bytes(raw_email)
@@ -397,6 +485,9 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set, processed_ur
         # Check if from authorized sender
         if not is_from_authorized_sender(from_header, AUTHORIZED_SENDERS):
             logger.info(f"  Skipped: Not from authorized sender (allowed: {', '.join(AUTHORIZED_SENDERS)})")
+            # Mark skipped messages as processed; otherwise every reconnect re-logs
+            # the same unread vendor/customer mail forever.
+            remember_email_processed()
             continue
 
         # Check if user is CC'd (or in To: for testing)
@@ -411,19 +502,24 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set, processed_ur
             # so it was sent to us somehow (likely BCC)
             logger.info(f"  Note: {WATCH_EMAIL} not visible in CC/To (possibly BCC'd) - proceeding anyway")
 
-        # Extract body and look for URL
+        # Extract body and look for a URL only in the fresh reply text.
+        # Quoted thread history often contains old presentation links; using the
+        # full body caused duplicate reruns or misleading support-thread handling.
         body = get_email_body(msg)
-        platform, url = extract_url(body)
+        fresh_body = strip_quoted_reply(body)
+        platform, url = extract_url(fresh_body)
 
         if platform and url:
-            logger.info(f"  Found {platform} URL: {url}")
+            logger.info(f"  Found {platform} URL: {redact_url(url)}")
 
-            # Check if this URL has already been processed (dedup replies with quoted URLs)
+            # processed_ids/UIDs provide idempotency. A fresh email containing a
+            # previously-seen URL is an intentional resend and must run again;
+            # otherwise Koell can resend after a fix and Alex silently ignores it.
             if url in processed_urls:
-                logger.info(f"  URL already processed, skipping: {url}")
-                mark_email_processed(email_id_str)
-                processed_ids.add(email_id_str)
-                continue
+                if should_rerun_processed_url(subject, fresh_body):
+                    logger.info(f"  URL already processed, rerun language detected; reprocessing: {redact_url(url)}")
+                else:
+                    logger.info(f"  URL already processed before; processing this fresh email anyway: {redact_url(url)}")
 
             # Extract client email from To: header (excluding our watch email)
             to_emails = extract_all_emails(to_header)
@@ -448,18 +544,19 @@ def process_new_emails(mail: imaplib.IMAP4_SSL, processed_ids: set, processed_ur
             logger.info(f"  Email context: from={from_addr}, to={len(to_emails)}, cc={len(cc_emails)}")
 
             if trigger_workflow(platform, url, client_email=client_email, email_context=email_context):
-                mark_email_processed(email_id_str)
-                processed_ids.add(email_id_str)
+                remember_email_processed()
                 mark_url_processed(url)
                 processed_urls.add(url)
                 logger.info(f"  Workflow triggered successfully")
             else:
                 logger.error(f"  Failed to trigger workflow")
         else:
-            logger.info(f"  No valid presentation URL found in email body")
+            if extract_url(body) != (None, None):
+                logger.info("  Presentation URL found only in quoted history; ignoring quoted link")
+            else:
+                logger.info(f"  No valid presentation URL found in fresh email body")
             # Track this email so we don't reprocess it every IDLE cycle
-            processed_ids.add(email_id_str)
-            mark_email_processed(email_id_str)
+            remember_email_processed()
 
 
 def watch_inbox() -> None:
