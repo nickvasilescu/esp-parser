@@ -1501,31 +1501,44 @@ def build_product_tier_line_items(
 
     line_items = []
 
-    # Sort breaks by quantity ascending
+    # Sort breaks by quantity ascending and keep only usable tiers
     sorted_breaks = sorted(breaks, key=lambda b: b.get("quantity", 0))
+    def _as_float(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
 
-    for brk in sorted_breaks:
-        qty = brk.get("quantity", 0)
-        sell_price = brk.get("sell_price")  # ALWAYS from presentation
+    valid_breaks = []
+    for b in sorted_breaks:
+        sp = _as_float(b.get("sell_price"))
+        q = b.get("quantity", 0)
+        if sp is not None and isinstance(q, (int, float)) and q > 0:
+            valid_breaks.append((q, sp))
 
-        if sell_price is None:
-            # Skip tiers without sell_price
-            logger.debug(f"Skipping tier qty={qty} - no sell_price")
-            continue
+    if not valid_breaks:
+        logger.info(f"No usable pricing tiers for {product_name}")
+        return line_items
 
-        if qty <= 0:
-            continue
+    # Emit ONE product line at the lowest-quantity tier (the default order qty) and
+    # preserve every price break in the description. Previously each tier was a separate
+    # billable line that summed into a nonsensical total Koell had to prune by hand.
+    qty, sell_price = valid_breaks[0]
+    breaks_summary = "; ".join(f"{q}+ @ ${sp:.2f}" for q, sp in valid_breaks)
 
-        line_items.append(build_estimate_line_item(
-            name=f"{product_name} ({base_code}) - Qty {qty}+",
-            description=f"Unit price at {qty}+ quantity tier",
-            rate=sell_price,
-            quantity=qty,
-            item_id=item_id,
-            unit="pcs"
-        ))
+    line_items.append(build_estimate_line_item(
+        name=f"{product_name} ({base_code})",
+        description=f"Qty price breaks: {breaks_summary}. Adjust quantity as needed.",
+        rate=sell_price,
+        quantity=qty,
+        item_id=item_id,
+        unit="pcs"
+    ))
 
-    logger.info(f"Built {len(line_items)} quantity tier line items for {product_name}")
+    logger.info(
+        f"Built 1 product line for {product_name} at primary tier {qty}+ "
+        f"(${sell_price}); {len(valid_breaks)} price breaks captured in description"
+    )
     return line_items
 
 
@@ -1620,7 +1633,7 @@ def build_decoration_line_items(
                 description=get_fee_description(fee),
                 rate=rate,
                 quantity=1,
-                item_id=item_ids.get(fee_type) if item_ids else None,
+                item_id=(item_ids or {}).get(fee_type.replace("_", "")) or (item_ids or {}).get(fee_type),
                 unit="ea"
             ))
 
@@ -1641,6 +1654,7 @@ def build_decoration_line_items(
                     description=get_fee_description(fee),
                     rate=rate,
                     quantity=1,
+                    item_id=(item_ids or {}).get(fee_type.replace("_", "")) or (item_ids or {}).get(fee_type),
                     unit="ea"
                 ))
 
@@ -1663,15 +1677,10 @@ def build_decoration_line_items(
             for li in line_items
         )
 
+        # $0 "Decoration Option" placeholder lines suppressed: they were clutter
+        # Koell deleted by hand. Methods with a real price are captured as fee lines above.
         if not method_exists:
-            # Add as option line (price TBD or $0 placeholder)
-            line_items.append(build_estimate_line_item(
-                name=f"Decoration Option: {method_name}",
-                description=method_notes or f"{method_name} decoration method - price TBD",
-                rate=0.00,  # Price TBD - user fills in
-                quantity=1,
-                unit="ea"
-            ))
+            pass
 
     logger.info(f"Built {len(line_items)} decoration line items (fan-out approach)")
     return line_items
@@ -1813,7 +1822,8 @@ def build_estimate_payload(
         # SKU format: <client_num>-<base_code>
         item_id = None
         for sku, iid in item_master_map.items():
-            if base_code in sku:
+            # Match the base product item only; never a "+setup"/"+pms"/... fee SKU.
+            if base_code in sku and "+" not in sku:
                 item_id = iid
                 logger.debug(f"Found Item Master link: {sku} -> {iid}")
                 break
@@ -1842,7 +1852,13 @@ def build_estimate_payload(
             all_line_items.append(setup_line)
 
         # 3. Decoration options (fan-out approach)
-        deco_lines = build_decoration_line_items(product)
+        # Build fee_type -> item_id map from Item Master so decoration/fee lines
+        # link to real catalog items instead of becoming SKU-less memo lines.
+        fee_item_ids = {}
+        for _sku, _iid in item_master_map.items():
+            if "+" in _sku:
+                fee_item_ids[_sku.split("+", 1)[1].lower()] = _iid
+        deco_lines = build_decoration_line_items(product, fee_item_ids)
         all_line_items.extend(deco_lines)
 
         # 4. Check for explicit quoted shipping

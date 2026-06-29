@@ -311,17 +311,19 @@ class JobStateManager:
 
     def set_link(self, link_type: str, url: str) -> None:
         """Set a result link (presentation_pdf, output_json, zoho_item, zoho_quote, calculator)."""
-        link_field = f"{link_type}_url" if not link_type.endswith("_url") and not link_type.endswith("_link") else link_type
-        if link_field == "presentation_pdf":
-            link_field = "presentation_pdf_url"
-        elif link_field == "output_json":
-            link_field = "output_json_url"
-        elif link_field == "zoho_item":
-            link_field = "zoho_item_link"
-        elif link_field == "zoho_quote":
-            link_field = "zoho_quote_link"
-        elif link_field == "calculator":
-            link_field = "calculator_link"
+        # Map shorthand names before adding default suffixes. The old order turned
+        # "zoho_quote" into "zoho_quote_url", which is not a JobState field, so
+        # quote/calculator links were silently dropped from dashboard state.
+        aliases = {
+            "presentation_pdf": "presentation_pdf_url",
+            "output_json": "output_json_url",
+            "zoho_item": "zoho_item_link",
+            "zoho_quote": "zoho_quote_link",
+            "calculator": "calculator_link",
+        }
+        link_field = aliases.get(link_type, link_type)
+        if not link_field.endswith("_url") and not link_field.endswith("_link"):
+            link_field = f"{link_field}_url"
 
         if hasattr(self.state, link_field):
             setattr(self.state, link_field, url)

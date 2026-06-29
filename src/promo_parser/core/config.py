@@ -99,6 +99,25 @@ MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "16384"))
 # Validation
 # =============================================================================
 
+def anthropic_healthcheck(api_key: Optional[str] = None) -> tuple:
+    """Cheap liveness/credit preflight for the Anthropic API.
+
+    Returns (ok: bool, message: str). ok=False on auth/credit/any error so callers
+    can fail fast with a clear reason instead of silently degrading to memo quotes.
+    """
+    try:
+        from anthropic import Anthropic
+        client = Anthropic(api_key=api_key or ANTHROPIC_API_KEY)
+        client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4,
+            messages=[{"role": "user", "content": "ping"}],
+        )
+        return True, "ok"
+    except Exception as e:
+        return False, str(e)
+
+
 def validate_config() -> None:
     """
     Validate that all required configuration values are present.

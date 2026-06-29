@@ -101,11 +101,13 @@ class OrgoFileHandler:
         Returns:
             Temporary download URL for the file, or None if export failed
         """
-        # Try both relative and absolute paths
-        # API accepts: 'Desktop/results.txt' or '/home/user/Desktop/results.txt'
+        # Try relative plus common home directories used by Orgo images.
+        # Older pipeline VMs used /home/user; newer Orgo images use /home/ubuntu or /root for bash.
         paths_to_try = [
-            remote_path,  # Relative path first
-            f"/home/user/{remote_path}",  # Absolute path as fallback
+            remote_path,
+            f"/home/user/{remote_path}",
+            f"/home/ubuntu/{remote_path}",
+            f"/root/{remote_path}",
         ]
 
         last_error = None
@@ -179,22 +181,36 @@ class OrgoFileHandler:
         if not computer:
             raise IOError("orgo package not available for bash fallback")
 
-        # Use absolute path
-        abs_path = f"/home/user/{remote_path}"
+        # Resolve the file across common Orgo home directories.
+        candidate_paths = [
+            remote_path if remote_path.startswith("/") else f"/home/user/{remote_path}",
+            remote_path if remote_path.startswith("/") else f"/home/ubuntu/{remote_path}",
+            remote_path if remote_path.startswith("/") else f"/root/{remote_path}",
+        ]
+        # Keep order while removing duplicates.
+        candidate_paths = list(dict.fromkeys(candidate_paths))
 
-        # Check if file exists and get size
-        logger.info(f"Checking file on VM: {abs_path}")
-        try:
-            size_output = computer.bash(f'stat -c %s "{abs_path}" 2>/dev/null || echo "NOT_FOUND"')
-            if "NOT_FOUND" in size_output or not size_output.strip():
-                raise FileNotFoundError(f"File not found on VM: {abs_path}")
+        abs_path = None
+        file_size = None
+        last_check_error = None
+        for candidate in candidate_paths:
+            logger.info(f"Checking file on VM: {candidate}")
+            try:
+                size_output = computer.bash(f'stat -c %s "{candidate}" 2>/dev/null || echo "NOT_FOUND"')
+                if "NOT_FOUND" in size_output or not size_output.strip():
+                    continue
+                file_size = int(size_output.strip())
+                abs_path = candidate
+                logger.info(f"File found: {abs_path} ({file_size} bytes)")
+                break
+            except Exception as e:
+                last_check_error = e
+                continue
 
-            file_size = int(size_output.strip())
-            logger.info(f"File size: {file_size} bytes")
-        except Exception as e:
-            if "NOT_FOUND" in str(e):
-                raise FileNotFoundError(f"File not found on VM: {abs_path}")
-            raise IOError(f"Failed to check file: {e}")
+        if not abs_path or file_size is None:
+            if last_check_error:
+                raise IOError(f"Failed to check file: {last_check_error}")
+            raise FileNotFoundError(f"File not found on VM in any known home dir: {remote_path}")
 
         # For files up to ~5MB, transfer in one chunk
         # For larger files, split into chunks

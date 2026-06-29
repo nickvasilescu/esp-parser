@@ -363,7 +363,7 @@ def _normalize_sage(data: Dict[str, Any]) -> UnifiedOutput:
     )
     
     # Build client
-    client_data = data.get("client", {})
+    client_data = metadata.get("client", data.get("client", {}))
     unified_client = UnifiedClient(
         id=client_data.get("id"),
         name=client_data.get("name"),
@@ -374,7 +374,7 @@ def _normalize_sage(data: Dict[str, Any]) -> UnifiedOutput:
     )
     
     # Build presenter
-    presenter_data = data.get("presenter", {})
+    presenter_data = metadata.get("presenter", data.get("presenter", {}))
     unified_presenter = UnifiedPresenter(
         name=presenter_data.get("name"),
         company=presenter_data.get("company"),

@@ -85,6 +85,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _redact_mpo_url(url: str) -> str:
+    import re
+    return re.sub(r"(?i)(accessCode=)[^&\s\]\)]+", r"\1[REDACTED]", url or "")
+
+
 # =============================================================================
 # URL Routing
 # =============================================================================
@@ -118,6 +123,299 @@ def detect_presentation_type(url: str) -> PresentationType:
 
 
 # =============================================================================
+# ASI/MARS API Extraction for MyPromoOffice Shared Presentations
+# =============================================================================
+
+def _extract_mpo_presentation_credentials(url: str) -> tuple[Optional[str], Optional[str]]:
+    import re
+    from urllib.parse import parse_qs
+
+    parsed = urlparse(url)
+    match = re.search(r"/presentations/(\d+)", parsed.path)
+    presentation_id = match.group(1) if match else None
+
+    query = parse_qs(parsed.query or "")
+    access_code = (query.get("accessCode") or query.get("accesscode") or [None])[0]
+    if access_code:
+        access_code = access_code.strip().strip(" \t\r\n]})>\"'")
+
+    return presentation_id, access_code
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).replace("$", "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    try:
+        return int(float(str(value).replace(",", "").strip()))
+    except (TypeError, ValueError):
+        return None
+
+
+def _mars_quantity_from(price: Dict[str, Any]) -> Optional[int]:
+    quantity = price.get("Quantity")
+    if isinstance(quantity, dict):
+        return _safe_int(quantity.get("From") or quantity.get("from"))
+    return _safe_int(quantity)
+
+
+def _first_visible_price_grid(product: Dict[str, Any], key: str = "PriceGrids") -> Dict[str, Any]:
+    grids = product.get(key) or []
+    visible = [g for g in grids if g.get("IsVisible", True)] or grids
+    visible.sort(key=lambda g: g.get("Sequence", 0) or 0)
+    return visible[0] if visible else {}
+
+
+def _mars_attribute_values(product: Dict[str, Any], attr_type: Optional[str] = None, name_contains: Optional[str] = None) -> List[str]:
+    values: List[str] = []
+    for attr in product.get("Attributes") or []:
+        if attr_type and attr.get("Type") != attr_type:
+            continue
+        if name_contains and name_contains.lower() not in str(attr.get("Name", "")).lower():
+            continue
+        for val in attr.get("Values") or []:
+            if val.get("IsVisible", True) and val.get("Value"):
+                values.append(str(val.get("Value")))
+    return values
+
+
+def _mars_charge_type(charge: Dict[str, Any]) -> str:
+    code = str(charge.get("Type") or "").upper()
+    name = str(charge.get("Name") or "").lower()
+    if code == "STCH" or "set-up" in name or "setup" in name:
+        return "setup"
+    if code in {"RUN", "RUNCH"} or "run" in name:
+        return "run"
+    return code.lower() or "other"
+
+
+def _transform_mars_product(product: Dict[str, Any]) -> Dict[str, Any]:
+    supplier = product.get("Supplier") or {}
+    price_grid = _first_visible_price_grid(product, "PriceGrids")
+    original_grid = _first_visible_price_grid(product, "OriginalPriceGrids")
+
+    original_by_qty: Dict[int, Dict[str, Any]] = {}
+    for original_price in original_grid.get("Prices") or []:
+        qty = _mars_quantity_from(original_price)
+        if qty is not None:
+            original_by_qty[qty] = original_price
+
+    price_breaks = []
+    for price in price_grid.get("Prices") or []:
+        if not price.get("IsVisible", True):
+            continue
+        qty = _mars_quantity_from(price)
+        if qty is None:
+            continue
+        original = original_by_qty.get(qty, {})
+        sell_price = _safe_float(price.get("Price"))
+        net_cost = _safe_float(price.get("Cost"))
+        catalog_price = _safe_float(original.get("Price"))
+        price_breaks.append({
+            "min_qty": qty,
+            "max_qty": _safe_int((price.get("Quantity") or {}).get("To")) if isinstance(price.get("Quantity"), dict) else None,
+            "sell_price": sell_price,
+            "net_cost": net_cost,
+            "catalog_price": catalog_price if catalog_price is not None else sell_price,
+            "discount_code": price.get("DiscountCode"),
+            "discount_percent": _safe_float(price.get("DiscountPercent")),
+            "currency": price.get("CurrencyCode") or "USD",
+        })
+
+    fees = []
+    for charge in product.get("Charges") or []:
+        if not charge.get("IsVisible", True):
+            continue
+        prices = [p for p in (charge.get("Prices") or []) if p.get("IsVisible", True)]
+        first_price = prices[0] if prices else {}
+        fees.append({
+            "fee_type": _mars_charge_type(charge),
+            "name": charge.get("Name") or "Additional Charge",
+            "description": charge.get("Description"),
+            "list_price": _safe_float(first_price.get("Price")),
+            "net_cost": _safe_float(first_price.get("Cost")),
+            "price_code": first_price.get("DiscountCode"),
+            "charge_basis": "per_order" if _mars_quantity_from(first_price) in (None, 0, 1) else "per_unit",
+            "min_qty": _mars_quantity_from(first_price),
+            "decoration_method": None,
+            "notes": charge.get("PriceIncludes"),
+        })
+
+    variants = []
+    for attr in product.get("Attributes") or []:
+        options = [str(v.get("Value")) for v in attr.get("Values") or [] if v.get("IsVisible", True) and v.get("Value")]
+        if options:
+            variants.append({
+                "attribute": attr.get("Type") or attr.get("Name") or "option",
+                "label": attr.get("Name") or attr.get("Type") or "Option",
+                "options": options,
+                "notes": attr.get("Description"),
+            })
+
+    methods = [{"name": m, "full_color": "full" in m.lower(), "notes": None} for m in _mars_attribute_values(product, attr_type="IMMD")]
+    if not methods and product.get("ImprintColors"):
+        methods = [{"name": "Imprint", "full_color": "full" in str(product.get("ImprintColors", "")).lower(), "notes": None}]
+
+    locations = []
+    for loc in [x.strip() for x in str(product.get("ImprintLocations") or "").split(",") if x.strip()]:
+        locations.append({"name": loc, "component": None, "methods_allowed": [m.get("name") for m in methods], "imprint_areas": []})
+
+    colors = _mars_attribute_values(product, attr_type="PRCL")
+    if not colors:
+        colors = _mars_attribute_values(product, name_contains="color")
+
+    images = []
+    for media in product.get("Media") or []:
+        if media.get("IsVisible", True) and media.get("Url"):
+            images.append({"url": media.get("Url"), "is_primary": media.get("IsPrimary", False), "type": media.get("Type")})
+
+    warnings = product.get("Warnings") or []
+    supplier_disclaimers = []
+    for warning in warnings:
+        if isinstance(warning, dict):
+            supplier_disclaimers.append(warning.get("Message") or warning.get("Description") or str(warning))
+        else:
+            supplier_disclaimers.append(str(warning))
+
+    return {
+        "item": {
+            "name": product.get("Name") or "",
+            "description_short": product.get("Summary") or "",
+            "description_long": product.get("Description") or product.get("Summary") or "",
+            "vendor_sku": product.get("Number") or product.get("ProductId"),
+            "mpn": product.get("Number") or product.get("ProductId"),
+            "cpn": product.get("CPN"),
+            "categories": [],
+            "themes": [],
+            "materials": _mars_attribute_values(product, name_contains="material"),
+            "colors": colors,
+            "primary_color": colors[0] if colors else None,
+        },
+        "vendor": {
+            "name": supplier.get("Name") or "",
+            "asi": supplier.get("ExternalId"),
+            "phones": [supplier.get("PrimaryPhoneNumber")] if supplier.get("PrimaryPhoneNumber") else [],
+            "emails": [supplier.get("PrimaryEmailAddress")] if supplier.get("PrimaryEmailAddress") else [],
+        },
+        "pricing": {
+            "breaks": price_breaks,
+            "price_code": price_breaks[0].get("discount_code") if price_breaks else None,
+            "currency": product.get("CurrencyCode") or (price_breaks[0].get("currency") if price_breaks else "USD"),
+            "price_includes": price_grid.get("PriceIncludes"),
+            "notes": price_grid.get("Description"),
+        },
+        "fees": fees,
+        "decoration": {
+            "methods": methods,
+            "locations": locations,
+            "imprint_colors_description": product.get("ImprintColors"),
+            "sold_unimprinted": None,
+            "personalization_available": None,
+            "full_color_process_available": None,
+        },
+        "variants": variants,
+        "raw_notes": {
+            "supplier_disclaimers": supplier_disclaimers,
+            "other": product.get("Prop65AdditionalInfo") or "",
+        },
+        "flags": {
+            "has_prop65_warnings": product.get("HasProp65Warnings", False),
+            "mars_product_id": product.get("ProductId"),
+            "mars_presentation_product_id": product.get("Id"),
+        },
+        "images": images,
+        "imprint_sizes": product.get("ImprintSizes"),
+        "imprint_locations": product.get("ImprintLocations"),
+    }
+
+
+def fetch_esp_presentation_from_mars(url: str, limit_products: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    presentation_id, access_code = _extract_mpo_presentation_credentials(url)
+    if not presentation_id or not access_code:
+        logger.info("MARS API skipped: shared presentation ID/accessCode not present in URL")
+        return None
+
+    import requests
+
+    base_url = "https://services.asicentral.com/mars/api"
+    session = requests.Session()
+    login_response = session.post(
+        f"{base_url}/account/login",
+        json={"presentationId": int(presentation_id), "accessCode": access_code},
+        timeout=30,
+    )
+    login_response.raise_for_status()
+    token = login_response.json()
+    if not isinstance(token, str) or not token:
+        raise ValueError("MARS login did not return an auth token")
+
+    presentation_response = session.get(
+        f"{base_url}/presentations/{presentation_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=60,
+    )
+    presentation_response.raise_for_status()
+    presentation = presentation_response.json()
+
+    mars_products = [p for p in (presentation.get("Products") or []) if p.get("IsVisible", True)]
+    mars_products.sort(key=lambda p: p.get("Sequence", 0) or 0)
+    if limit_products is not None and limit_products > 0:
+        mars_products = mars_products[:limit_products]
+
+    products = [_transform_mars_product(p) for p in mars_products]
+    if not products:
+        return None
+
+    customer = presentation.get("Customer") or {}
+    presentation_data = {
+        "url": url,
+        "title": presentation.get("Name"),
+        "client": {
+            "id": customer.get("Id"),
+            "name": customer.get("Name"),
+            "company": customer.get("Name"),
+            "email": customer.get("PrimaryEmailAddress"),
+            "phone": customer.get("PrimaryPhoneNumber"),
+        },
+        "presenter": {},
+        "total_items": len(products),
+    }
+
+    final_output = create_zoho_ready_output(
+        source_type="esp",
+        presentation_data=presentation_data,
+        products=products,
+        errors=[],
+    )
+    final_output["metadata"]["extraction_method"] = "mars_api"
+    final_output["metadata"]["mars_presentation_id"] = presentation_id
+    final_output["pricing_sources"] = {
+        "sell_price": "From ASI/MARS presentation PriceGrids",
+        "net_cost": "From ASI/MARS presentation PriceGrids Cost fields",
+        "catalog_price": "From ASI/MARS OriginalPriceGrids",
+        "margin_calculation": "sell_price - net_cost = margin",
+    }
+    final_output["esp_api_note"] = "Extracted from ASI/MARS JSON API; CUA/PDF fallback skipped."
+    return final_output
+
+
+# =============================================================================
 # Output Structure
 # =============================================================================
 
@@ -143,7 +441,7 @@ def create_zoho_ready_output(
         "metadata": {
             "generated_at": datetime.now().isoformat(),
             "source_type": source_type,
-            "presentation_url": presentation_data.get("url"),
+            "presentation_url": _redact_mpo_url(presentation_data.get("url")),
             "presentation_title": presentation_data.get("title"),
             "client": presentation_data.get("client", {}),
             "presenter": presentation_data.get("presenter", {}),
@@ -292,6 +590,51 @@ def merge_presentation_and_product_data(
 # SAGE Pipeline
 # =============================================================================
 
+def _alert(message: str) -> None:
+    """Failure alert so a hard failure can never be silent again: prominent ERROR log,
+    append to logs/ALERTS.log, plus a best-effort push email to the pipeline OWNER
+    (AgentMail -> ALERT_EMAIL, never the client). Push fires at most once per process."""
+    import os as _os
+    from datetime import datetime as _dt
+    logging.getLogger(__name__).error("ALERT: %s", message)
+    try:
+        p = "/opt/promo-pipeline/logs/ALERTS.log"
+        _os.makedirs(_os.path.dirname(p), exist_ok=True)
+        with open(p, "a") as fh:
+            fh.write("%sZ\t%s\n" % (_dt.utcnow().isoformat(), message))
+    except Exception:
+        pass
+    global _ALERT_PUSHED
+    try:
+        if _os.getenv("ALERT_PUSH_DISABLED") == "1" or _ALERT_PUSHED:
+            return
+        key = _os.getenv("AGENTMAIL_API_KEY")
+        inbox = _os.getenv("AGENTMAIL_INBOX_ID") or "alex_stbl@agentmail.to"
+        to = _os.getenv("ALERT_EMAIL") or "nick@orgo.ai"
+        if key:
+            import requests
+            requests.post(
+                "https://api.agentmail.to/v0/inboxes/%s/messages/send" % inbox,
+                headers={"Authorization": "Bearer %s" % key, "Content-Type": "application/json"},
+                json={"to": [to], "subject": "[promo-pipeline ALERT] pipeline failure", "text": message},
+                timeout=15,
+            )
+            _ALERT_PUSHED = True
+    except Exception:
+        pass
+
+
+_ALERT_PUSHED = False
+
+def _upload_produced_items(zoho_result) -> bool:
+    """True only if the Item Master upload created >=1 real catalog item."""
+    return bool(
+        zoho_result is not None
+        and getattr(zoho_result, "success", False)
+        and getattr(zoho_result, "successful_uploads", 0) > 0
+    )
+
+
 def run_sage_pipeline(
     url: str,
     dry_run: bool = False,
@@ -317,7 +660,7 @@ def run_sage_pipeline(
     logger.info("=" * 60)
     logger.info("SAGE PIPELINE")
     logger.info("=" * 60)
-    logger.info(f"URL: {url}")
+    logger.info(f"URL: {_redact_mpo_url(url)}")
 
     if dry_run:
         logger.info("[DRY RUN] Would process SAGE presentation")
@@ -433,7 +776,7 @@ def run_esp_pipeline(
     logger.info("ESP PIPELINE")
     logger.info("=" * 60)
     logger.info(f"Job ID: {job_id}")
-    logger.info(f"URL: {url}")
+    logger.info(f"URL: {_redact_mpo_url(url)}")
 
     errors = []
 
@@ -449,6 +792,19 @@ def run_esp_pipeline(
     output_dir.mkdir(parents=True, exist_ok=True)
     pdfs_dir = output_dir / "pdfs" / job_id
     pdfs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Prefer ASI/MARS JSON for MyPromoOffice shared links. It contains the
+    # product list, sell pricing, net costs, setup charges, and imprint data
+    # directly, avoiding brittle PDF parsing that can produce zero products.
+    if not dry_run:
+        try:
+            mars_output = fetch_esp_presentation_from_mars(url, limit_products=limit_products)
+            if mars_output and mars_output.get("products"):
+                logger.info(f"MARS API extraction succeeded: {len(mars_output.get('products', []))} products")
+                return mars_output
+        except Exception as e:
+            errors.append({"step": "mars_api", "message": f"MARS API extraction failed: {str(e)}"})
+            logger.warning(f"MARS API extraction failed; falling back to CUA/PDF flow: {e}")
     
     # =========================================================================
     # Step 1: Download ESP Presentation PDF
@@ -897,6 +1253,20 @@ def run_esp_pipeline(
     logger.info("=" * 60)
     logger.info("STEP 6: GENERATE OUTPUT")
     logger.info("=" * 60)
+
+    if not merged_products and not dry_run:
+        try:
+            mars_output = fetch_esp_presentation_from_mars(url, limit_products=limit_products)
+            if mars_output and mars_output.get("products"):
+                logger.info(f"MARS API fallback succeeded after empty CUA/PDF result: {len(mars_output.get('products', []))} products")
+                if errors:
+                    mars_output.setdefault("errors", []).extend(errors)
+                    if isinstance(mars_output.get("metadata"), dict):
+                        mars_output["metadata"]["total_errors"] = len(mars_output.get("errors", []))
+                return mars_output
+        except Exception as e:
+            errors.append({"step": "mars_api_fallback", "message": f"MARS API fallback failed: {str(e)}"})
+            logger.warning(f"MARS API fallback failed after empty CUA/PDF result: {e}")
     
     final_output = create_zoho_ready_output(
         source_type="esp",
@@ -1003,7 +1373,7 @@ class Orchestrator:
         logger.info("MULTI-SOURCE ORCHESTRATOR")
         logger.info("=" * 60)
         logger.info(f"Job ID: {self.job_id}")
-        logger.info(f"URL: {self.url}")
+        logger.info(f"URL: {_redact_mpo_url(self.url)}")
         logger.info(f"Detected Type: {self.presentation_type.value}")
         logger.info(f"Dry Run: {self.dry_run}")
         logger.info(f"Skip CUA: {self.skip_cua}")
@@ -1014,7 +1384,7 @@ class Orchestrator:
             agent="orchestrator",
             event_type="checkpoint",
             content=f"Starting {self.presentation_type.value.upper()} pipeline",
-            metadata={"job_id": self.job_id, "url": self.url}
+            metadata={"job_id": self.job_id, "url": _redact_mpo_url(self.url)}
         )
 
         # Emit state: detecting source
@@ -1043,7 +1413,7 @@ class Orchestrator:
                     state_manager=self.state_manager
                 )
             else:
-                logger.error(f"Unknown presentation type for URL: {self.url}")
+                logger.error(f"Unknown presentation type for URL: {_redact_mpo_url(self.url)}")
                 result = {
                     "success": False,
                     "error": f"Unknown presentation URL type. Supported domains: {SAGE_PRESENTATION_DOMAIN}, portal.mypromooffice.com"
@@ -1100,15 +1470,46 @@ class Orchestrator:
             json.dump(result, f, indent=2, ensure_ascii=False)
         
         logger.info(f"Raw output saved to: {raw_output_path}")
+
+        # Guardrail: never run downstream customer-facing actions on an empty extraction.
+        # This prevents blank Zoho quotes / zero-product calculators when CUA or parsing fails.
+        downstream_blocked = len(normalized_result.get("products", []) or []) == 0
+        if downstream_blocked:
+            pipeline_errors = normalized_result.get("errors", []) or []
+            first_error = ""
+            if pipeline_errors:
+                first_error = pipeline_errors[0].get("message") if isinstance(pipeline_errors[0], dict) else str(pipeline_errors[0])
+            block_reason = "No products were extracted from the presentation"
+            if first_error:
+                block_reason = f"{block_reason}; first error: {first_error}"
+            logger.error(f"Blocking downstream actions: {block_reason}")
+            normalized_result["success"] = False
+            normalized_result["downstream_blocked"] = True
+            normalized_result["downstream_blocked_reason"] = block_reason
+            if self.zoho_upload:
+                normalized_result["zoho_upload_result"] = {"success": False, "skipped": True, "error": block_reason}
+            if self.zoho_quote:
+                normalized_result["zoho_quote_result"] = {"success": False, "skipped": True, "error": block_reason}
+            if self.calculator:
+                normalized_result["calculator_result"] = {"success": False, "skipped": True, "products_count": 0, "error": block_reason}
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(normalized_result, f, indent=2, ensure_ascii=False)
         
         # =========================================================================
         # Optional: Zoho Item Master Upload
         # =========================================================================
         zoho_result = None
-        if self.zoho_upload:
+        if self.zoho_upload and not downstream_blocked:
             logger.info("=" * 60)
             logger.info("ZOHO ITEM MASTER UPLOAD")
             logger.info("=" * 60)
+
+            # Preflight: confirm the Anthropic key has credit/auth BEFORE the agentic
+            # item-master upload. A dead key here is the root cause of SKU-less memo quotes.
+            from promo_parser.core.config import anthropic_healthcheck
+            _pf_ok, _pf_msg = anthropic_healthcheck()
+            if not _pf_ok:
+                _alert("Anthropic preflight FAILED before Item Master upload: %s" % _pf_msg)
             
             if not ZOHO_AVAILABLE:
                 logger.error("Zoho integration not available. Install zoho_item_agent module.")
@@ -1189,11 +1590,31 @@ class Orchestrator:
                         "error": str(e)
                     }
 
+        # Guardrail: never build a customer-facing quote when Item Master upload
+        # created zero catalog items. An empty Item-Master map yields SKU-less "memo"
+        # line items (the exact failure Koell reported). Block + alert + count as error.
+        if self.zoho_upload and not downstream_blocked and not _upload_produced_items(zoho_result):
+            cause = (normalized_result.get("zoho_upload_result") or {}).get("error") \
+                or "Item Master upload created 0 items"
+            reason = "Quote/calculator blocked: Item Master upload created no catalog items (%s)" % cause
+            _alert(reason)
+            downstream_blocked = True
+            normalized_result["success"] = False
+            normalized_result["downstream_blocked"] = True
+            normalized_result["downstream_blocked_reason"] = reason
+            normalized_result.setdefault("errors", []).append({"step": "zoho_item_master", "message": reason})
+            if self.zoho_quote:
+                normalized_result["zoho_quote_result"] = {"success": False, "skipped": True, "error": reason}
+            if self.calculator:
+                normalized_result["calculator_result"] = {"success": False, "skipped": True, "products_count": 0, "error": reason}
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(normalized_result, f, indent=2, ensure_ascii=False)
+
         # =========================================================================
         # Optional: Zoho Quote Creation
         # =========================================================================
         quote_result = None
-        if self.zoho_quote:
+        if self.zoho_quote and not downstream_blocked:
             logger.info("=" * 60)
             logger.info("ZOHO QUOTE CREATION")
             logger.info("=" * 60)
@@ -1208,22 +1629,59 @@ class Orchestrator:
                     # Emit state: creating quote
                     self.state_manager.update(WorkflowStatus.ZOHO_CREATING_QUOTE.value)
 
-                    # CRITICAL FIX: Inject customer email from email context
-                    # The email TO address is the most reliable way to identify the customer
+                    # Inject a customer email from the triggering email context.
+                    # Prefer external participants and never use STBL/internal routing inboxes
+                    # like cs@stblstrategies.com as the Zoho customer lookup key.
                     if self.email_context_path:
                         try:
                             with open(self.email_context_path, 'r') as f:
                                 email_ctx = json.load(f)
-                            # Get the TO address as the customer email
-                            to_addresses = email_ctx.get("to_addresses", [])
-                            if to_addresses:
-                                client_email_from_context = to_addresses[0]
-                                # Inject into normalized_result.client
+
+                            internal_domains = {"stblstrategies.com", "computeruse.agency", "orgo.ai"}
+
+                            def normalize_email(value):
+                                if not value:
+                                    return ""
+                                text = str(value).strip()
+                                if "<" in text and ">" in text:
+                                    text = text.split("<", 1)[1].split(">", 1)[0]
+                                return text.strip().lower()
+
+                            def is_external(email):
+                                email = normalize_email(email)
+                                if "@" not in email:
+                                    return False
+                                domain = email.rsplit("@", 1)[1]
+                                return domain not in internal_domains and not domain.endswith(".stblstrategies.com")
+
+                            from_email = normalize_email(email_ctx.get("from_address") or email_ctx.get("from"))
+                            to_addresses = email_ctx.get("to_addresses", []) or []
+                            cc_addresses = email_ctx.get("cc_addresses", []) or []
+
+                            # If customer emailed STBL, use the sender. If Koell/STBL sent it,
+                            # use the first external recipient in To/Cc.
+                            client_email_from_context = None
+                            if is_external(from_email):
+                                client_email_from_context = from_email
+                            else:
+                                for candidate in list(to_addresses) + list(cc_addresses):
+                                    candidate = normalize_email(candidate)
+                                    if is_external(candidate):
+                                        client_email_from_context = candidate
+                                        break
+
+                            if client_email_from_context:
                                 if not normalized_result.get("client"):
                                     normalized_result["client"] = {}
-                                if not normalized_result["client"].get("email"):
+                                existing_email = normalize_email(normalized_result["client"].get("email"))
+                                if not existing_email or not is_external(existing_email):
                                     normalized_result["client"]["email"] = client_email_from_context
-                                    logger.info(f"Customer email from email context: {client_email_from_context}")
+                                    logger.info(
+                                        "Customer email from external email context domain: %s",
+                                        client_email_from_context.rsplit("@", 1)[1]
+                                    )
+                            else:
+                                logger.warning("No external customer email found in email context for quote lookup")
                         except Exception as e:
                             logger.warning(f"Failed to load email context for quote: {e}")
 
@@ -1277,12 +1735,14 @@ class Orchestrator:
                         "success": False,
                         "error": str(e)
                     }
+                    normalized_result.setdefault("errors", []).append({"step": "zoho_quote", "message": str(e)})
+                    _alert("Zoho quote creation failed: %s" % e)
 
         # =========================================================================
         # Optional: Calculator Generation
         # =========================================================================
         calc_result = None
-        if self.calculator:
+        if self.calculator and not downstream_blocked:
             logger.info("=" * 60)
             logger.info("CALCULATOR GENERATION")
             logger.info("=" * 60)
@@ -1344,6 +1804,8 @@ class Orchestrator:
                         "success": False,
                         "error": str(e)
                     }
+                    normalized_result.setdefault("errors", []).append({"step": "calculator", "message": str(e)})
+                    _alert("Calculator generation failed: %s" % e)
 
         # Emit final state: completed
         has_errors = len(normalized_result.get('errors', [])) > 0
